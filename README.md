@@ -434,6 +434,76 @@ distributed-lock/
 | **Observability-first** | Every operation is metered, logged, and traced |
 | **Best-effort mutual exclusion** | Not a consensus system; designed for coordination, not correctness guarantees |
 
+## Acquire Outcome Reference
+
+Every acquisition returns an explicit `AcquireOutcome` so callers can react to each scenario:
+
+| Outcome | `isAcquired()` | `isVerifiedOwnership()` | Consumer Action |
+|---|---|---|---|
+| `ACQUIRED` | `true` | `true` | Proceed normally. Pass `fencingToken` to downstream writes. |
+| `CONTENDED` | `false` | `false` | Lock is held by another client. Skip or retry later. |
+| `TIMEOUT` | `false` | `false` | Retry budget exhausted. Log and alert if persistent. |
+| `BACKEND_UNAVAILABLE` | `false` | `false` | Redis/circuit breaker down. Operation cannot proceed safely. |
+| `FAIL_OPEN_SYNTHETIC` | `true` | `false` | **Degraded mode.** Lock NOT verified in backend. `fencingToken=0`. Design downstream to handle duplicate execution. |
+
+```java
+LockResult result = lockClient.tryAcquire(request);
+
+switch (result.getOutcome()) {
+    case ACQUIRED -> executeJob(result.getFencingToken());
+    case CONTENDED -> log.info("Lock held by another instance, skipping");
+    case BACKEND_UNAVAILABLE -> alertOps("Redis down, job skipped");
+    case FAIL_OPEN_SYNTHETIC -> executeJobIdempotent(); // unverified ownership
+    case TIMEOUT -> log.warn("Could not acquire lock within timeout");
+}
+```
+
+## When NOT to Use This Library
+
+This library provides **best-effort mutual exclusion**, not linearizable consensus. Do not use it when:
+
+| Scenario | Why Not | Use Instead |
+|---|---|---|
+| **Financial transactions requiring exactly-once** | Lease expiry can cause dual execution | Database transactions + idempotency keys |
+| **Strict leader election** | Split-brain possible during network partition | ZooKeeper, etcd (consensus-based) |
+| **Cross-region coordination** | Redis replication is async; failover loses writes | etcd, CockroachDB, Spanner |
+| **Sub-millisecond lock contention** | Redis round-trip adds 1-3ms per operation | In-process locks (`ReentrantLock`, `synchronized`) |
+| **Locks held for hours** | Long leases delay recovery; auto-renew adds complexity | Database-backed lease with explicit heartbeat table |
+
+**Use this library when:**
+- You need distributed coordination across application instances
+- Best-effort mutual exclusion is acceptable (with idempotent downstream operations)
+- You want low operational overhead (embedded library, no extra service)
+- Lock durations are seconds to minutes, not hours
+
+## Why Not Redlock?
+
+This library uses a single Redis instance (or Sentinel/Cluster for HA), not the [Redlock algorithm](https://redis.io/docs/manual/patterns/distributed-locks/). This is intentional:
+
+| Aspect | Single Redis | Redlock (N instances) |
+|---|---|---|
+| **Consistency** | Best-effort (lease-based) | Still best-effort (no consensus) |
+| **Operational complexity** | One Redis | 5+ independent Redis instances |
+| **Martin Kleppmann's analysis** | Acknowledged limitation | [Critiqued as fundamentally flawed](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) |
+| **Our stance** | Honest: lease lock + fencing tokens | Redlock adds complexity without solving the core problem |
+
+If you need stronger guarantees, use a consensus system (ZooKeeper, etcd) instead of adding more Redis instances.
+
+## Tested Failure Scenarios
+
+| Scenario | Expected Behavior | Verified By |
+|---|---|---|
+| Redis stops | Acquisition returns `BACKEND_UNAVAILABLE` (fail-closed) | `ChaosTest.acquisitionFailsWhenRedisStops` |
+| Redis pauses and recovers | Circuit breaker transitions OPEN→HALF_OPEN→CLOSED | `ChaosTest.recoversAfterRedisRestart` |
+| Lock expires without renewal | Another client acquires successfully | `DistributedLockIntegrationTest.expiredLockBecomesAvailable` |
+| 10 concurrent contenders | Exactly one winner | `DistributedLockIntegrationTest.concurrentAcquisitionsProduceExactlyOneWinner` |
+| Task throws exception | Lock released in finally block | `DistributedLockIntegrationTest.executeWithLockReleasesOnException` |
+| Auto-renewal keeps lock alive | Lock held beyond original lease | `AutoRenewIntegrationTest.autoRenewKeepsLockAliveAfterOriginalLease` |
+| Lock lost during auto-renew | State transitions to LOST, callback invoked | `LockHandleTest.stateTransitionsToLostWhenRenewalFails` |
+| Fencing tokens increase | Monotonically increasing across reacquisitions | `FencingTokenIntegrationTest.fencingTokenIncrementsAcrossReacquisitions` |
+| `@DistributedLock` with auto-renew | Method runs beyond lease without losing lock | `AnnotationIntegrationTest.autoRenewKeepsLockDuringLongMethod` |
+| SpEL key resolves to blank | `IllegalArgumentException` thrown, method not executed | `AnnotationIntegrationTest.blankSpelKeyThrowsIllegalArgument` |
+
 ## Comparison with Existing Solutions
 
 | Tool | Type | Approach |
