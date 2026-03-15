@@ -3,6 +3,7 @@ package com.vamva.distributedlock.engine;
 import com.vamva.distributedlock.backend.InMemoryLockBackend;
 import com.vamva.distributedlock.config.DistributedLockProperties;
 import com.vamva.distributedlock.metrics.LockMetrics;
+import com.vamva.distributedlock.model.AcquireOutcome;
 import com.vamva.distributedlock.model.LockRequest;
 import com.vamva.distributedlock.model.LockResult;
 import com.vamva.distributedlock.token.TokenGenerator;
@@ -249,5 +250,52 @@ class LockEngineTest {
 
         assertFalse(result.isAcquired());
         assertTrue(elapsed < 1_000, "Should return immediately (single attempt), not wait 5s");
+    }
+
+    @Test
+    void acquireSuccessReturnsAcquiredOutcome() {
+        LockResult result = engine.tryAcquire(LockRequest.builder()
+                .resourceKey("job:test-outcome-1")
+                .leaseMs(30_000)
+                .build());
+
+        assertEquals(AcquireOutcome.ACQUIRED, result.getOutcome());
+        assertTrue(result.isVerifiedOwnership());
+        assertTrue(result.getFencingToken() > 0);
+    }
+
+    @Test
+    void acquireContendedReturnsContendedOutcome() {
+        engine.tryAcquire(LockRequest.builder()
+                .resourceKey("job:test-outcome-2")
+                .leaseMs(30_000)
+                .build());
+
+        LockResult result = engine.tryAcquire(LockRequest.builder()
+                .resourceKey("job:test-outcome-2")
+                .leaseMs(30_000)
+                .build());
+
+        assertEquals(AcquireOutcome.CONTENDED, result.getOutcome());
+        assertFalse(result.isAcquired());
+        assertFalse(result.isVerifiedOwnership());
+        assertEquals(0, result.getFencingToken());
+    }
+
+    @Test
+    void acquireTimeoutReturnsTimeoutOutcome() throws InterruptedException {
+        engine.tryAcquire(LockRequest.builder()
+                .resourceKey("job:test-outcome-3")
+                .leaseMs(60_000)
+                .build());
+
+        LockResult result = engine.acquire(LockRequest.builder()
+                .resourceKey("job:test-outcome-3")
+                .leaseMs(30_000)
+                .waitTimeoutMs(200)
+                .build());
+
+        assertEquals(AcquireOutcome.TIMEOUT, result.getOutcome());
+        assertFalse(result.isAcquired());
     }
 }

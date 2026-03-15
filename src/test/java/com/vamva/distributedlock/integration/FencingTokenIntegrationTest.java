@@ -1,6 +1,7 @@
 package com.vamva.distributedlock.integration;
 
 import com.vamva.distributedlock.api.DistributedLockClient;
+import com.vamva.distributedlock.model.AcquireOutcome;
 import com.vamva.distributedlock.model.LockRequest;
 import com.vamva.distributedlock.model.LockResult;
 import org.junit.jupiter.api.Test;
@@ -104,6 +105,37 @@ class FencingTokenIntegrationTest {
 
         assertFalse(failed.isAcquired());
         assertEquals(0, failed.getFencingToken(), "Failed acquire should have fence token 0");
+
+        lockClient.release(held.getResourceKey(), held.getLockToken());
+    }
+
+    @Test
+    void acquiredResultHasAcquiredOutcome() {
+        LockResult result = lockClient.tryAcquire(LockRequest.builder()
+                .resourceKey("fence:test:outcome:1")
+                .leaseMs(30_000)
+                .build());
+
+        assertEquals(AcquireOutcome.ACQUIRED, result.getOutcome());
+        assertTrue(result.isVerifiedOwnership());
+
+        lockClient.release(result.getResourceKey(), result.getLockToken());
+    }
+
+    @Test
+    void contendedResultHasContendedOutcome() {
+        LockResult held = lockClient.tryAcquire(LockRequest.builder()
+                .resourceKey("fence:test:outcome:2")
+                .leaseMs(30_000)
+                .build());
+
+        LockResult contended = lockClient.tryAcquire(LockRequest.builder()
+                .resourceKey("fence:test:outcome:2")
+                .leaseMs(30_000)
+                .build());
+
+        assertEquals(AcquireOutcome.CONTENDED, contended.getOutcome());
+        assertFalse(contended.isVerifiedOwnership());
 
         lockClient.release(held.getResourceKey(), held.getLockToken());
     }
