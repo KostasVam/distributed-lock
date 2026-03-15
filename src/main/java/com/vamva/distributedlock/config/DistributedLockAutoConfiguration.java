@@ -54,7 +54,8 @@ public class DistributedLockAutoConfiguration {
     public LockBackend redisLockBackend(StringRedisTemplate redisTemplate,
                                         DistributedLockProperties properties,
                                         LockMetrics metrics) {
-        return new RedisLockBackend(redisTemplate, properties.isFailOpen(), metrics);
+        return new RedisLockBackend(redisTemplate, properties.isFailOpen(), metrics,
+                properties.getCircuitBreaker());
     }
 
     @Bean
@@ -97,6 +98,15 @@ public class DistributedLockAutoConfiguration {
                                  DistributedLockProperties properties,
                                  ObservationRegistry observationRegistry) {
         return new LockEngine(backend, tokenGenerator, metrics, clock, properties, observationRegistry);
+    }
+
+    // ── Health ────────────────────────────────────────────────────────────
+
+    @Bean
+    @ConditionalOnMissingBean(DistributedLockHealthIndicator.class)
+    public DistributedLockHealthIndicator distributedLockHealthIndicator(
+            LockBackend backend, DistributedLockProperties properties) {
+        return new DistributedLockHealthIndicator(backend, properties.getBackend());
     }
 
     // ── Client API ───────────────────────────────────────────────────────
