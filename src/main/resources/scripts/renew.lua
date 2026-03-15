@@ -10,6 +10,7 @@ if current == false then
     return 0
 end
 if current == ARGV[1] then
-    return redis.call('PEXPIRE', KEYS[1], ARGV[2])
+    redis.call('PEXPIRE', KEYS[1], ARGV[2])
+    return 1
 end
 return -1

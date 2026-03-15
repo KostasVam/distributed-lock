@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Registry of active lock handles for graceful shutdown and auto-renewal scheduling.
@@ -61,7 +62,15 @@ public class LockRegistry {
             }
         }
 
-        renewalScheduler.shutdownNow();
+        renewalScheduler.shutdown();
+        try {
+            if (!renewalScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                renewalScheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            renewalScheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
 
         if (count > 0) {
             log.info("Graceful shutdown: all locks released");

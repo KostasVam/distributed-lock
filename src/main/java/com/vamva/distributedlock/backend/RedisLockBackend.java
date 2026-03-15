@@ -66,7 +66,7 @@ public class RedisLockBackend implements LockBackend {
             String fenceKey = key + ":fence";
             List result = redisTemplate.execute(acquireScript,
                     Arrays.asList(key, fenceKey), token, String.valueOf(leaseMs));
-            if (result != null && ((Number) result.get(0)).longValue() == 1L) {
+            if (result != null && result.size() >= 2 && ((Number) result.get(0)).longValue() == 1L) {
                 return ((Number) result.get(1)).longValue();
             }
             return -1L;
