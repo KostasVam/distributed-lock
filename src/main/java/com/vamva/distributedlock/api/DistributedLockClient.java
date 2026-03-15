@@ -1,6 +1,8 @@
 package com.vamva.distributedlock.api;
 
 import com.vamva.distributedlock.engine.LockEngine;
+import com.vamva.distributedlock.engine.LockHandle;
+import com.vamva.distributedlock.engine.LockRegistry;
 import com.vamva.distributedlock.model.LockRequest;
 import com.vamva.distributedlock.model.LockResult;
 import lombok.extern.slf4j.Slf4j;
@@ -23,9 +25,11 @@ import java.util.concurrent.Callable;
 public class DistributedLockClient {
 
     private final LockEngine engine;
+    private final LockRegistry registry;
 
-    public DistributedLockClient(LockEngine engine) {
+    public DistributedLockClient(LockEngine engine, LockRegistry registry) {
         this.engine = engine;
+        this.registry = registry;
     }
 
     /**
@@ -70,6 +74,43 @@ public class DistributedLockClient {
      */
     public boolean release(String resourceKey, String token) {
         return engine.release(resourceKey, token);
+    }
+
+    /**
+     * Acquires a lock and returns a handle with auto-renewal enabled.
+     *
+     * <p>The lock is automatically renewed at 2/3 of the lease interval. Use in a
+     * try-with-resources block for automatic release:</p>
+     * <pre>{@code
+     * try (LockHandle handle = lockClient.acquireWithAutoRenew(request)) {
+     *     // long-running work — lease renewed automatically
+     * }
+     * }</pre>
+     *
+     * <p>The handle is also registered for graceful shutdown — if the app shuts down
+     * while the lock is held, it will be released automatically.</p>
+     *
+     * @param request the lock request
+     * @return the lock handle
+     * @throws LockAcquisitionException if the lock cannot be acquired
+     * @throws InterruptedException if interrupted while waiting
+     */
+    public LockHandle acquireWithAutoRenew(LockRequest request) throws InterruptedException {
+        LockResult result = engine.acquire(request);
+
+        if (!result.isAcquired()) {
+            throw new LockAcquisitionException(
+                    "Failed to acquire lock for resource: " + request.getResourceKey());
+        }
+
+        long leaseMs = result.getLeaseMs();
+        long renewIntervalMs = leaseMs * 2 / 3;
+
+        LockHandle handle = new LockHandle(result, engine, registry);
+        registry.register(handle);
+        handle.startAutoRenewal(renewIntervalMs, leaseMs, registry.getRenewalScheduler());
+
+        return handle;
     }
 
     /**
