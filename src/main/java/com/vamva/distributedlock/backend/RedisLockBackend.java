@@ -35,7 +35,9 @@ public class RedisLockBackend implements LockBackend {
     private final LockMetrics metrics;
     private final CircuitBreaker circuitBreaker;
 
-    public RedisLockBackend(StringRedisTemplate redisTemplate, boolean failOpen, LockMetrics metrics) {
+    public RedisLockBackend(StringRedisTemplate redisTemplate, boolean failOpen,
+                            LockMetrics metrics,
+                            com.vamva.distributedlock.config.DistributedLockProperties.CircuitBreakerConfig cbConfig) {
         this.redisTemplate = redisTemplate;
         this.failOpen = failOpen;
         this.metrics = metrics;
@@ -45,11 +47,11 @@ public class RedisLockBackend implements LockBackend {
         this.renewScript = loadScript("scripts/renew.lua");
 
         CircuitBreakerConfig config = CircuitBreakerConfig.custom()
-                .failureRateThreshold(50)
-                .minimumNumberOfCalls(5)
-                .slidingWindowSize(10)
-                .waitDurationInOpenState(Duration.ofSeconds(10))
-                .permittedNumberOfCallsInHalfOpenState(3)
+                .failureRateThreshold(cbConfig.getFailureRateThreshold())
+                .minimumNumberOfCalls(cbConfig.getMinimumNumberOfCalls())
+                .slidingWindowSize(cbConfig.getSlidingWindowSize())
+                .waitDurationInOpenState(Duration.ofSeconds(cbConfig.getWaitDurationInOpenStateSeconds()))
+                .permittedNumberOfCallsInHalfOpenState(cbConfig.getPermittedNumberOfCallsInHalfOpenState())
                 .build();
 
         this.circuitBreaker = CircuitBreakerRegistry.of(config).circuitBreaker("redis-distributed-lock");
