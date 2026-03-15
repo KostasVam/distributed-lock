@@ -28,6 +28,12 @@ public class AnnotatedTestService {
         Thread.sleep(200);
     }
 
+    @DistributedLock(key = "#name", leaseMs = 30000)
+    public String nullableKeyMethod(String name) {
+        executionCount.incrementAndGet();
+        return "executed";
+    }
+
     public int getExecutionCount() {
         return executionCount.get();
     }

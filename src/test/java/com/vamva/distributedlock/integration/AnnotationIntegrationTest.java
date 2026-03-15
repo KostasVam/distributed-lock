@@ -86,6 +86,18 @@ class AnnotationIntegrationTest {
     }
 
     @Test
+    void blankSpelKeyThrowsIllegalArgument() {
+        assertThrows(IllegalArgumentException.class, () -> testService.nullableKeyMethod(""));
+        assertEquals(0, testService.getExecutionCount(), "Method should not have executed");
+    }
+
+    @Test
+    void nullSpelKeyThrowsIllegalArgument() {
+        assertThrows(IllegalArgumentException.class, () -> testService.nullableKeyMethod(null));
+        assertEquals(0, testService.getExecutionCount(), "Method should not have executed");
+    }
+
+    @Test
     void differentSpelKeysAreIndependent() {
         // These use different IDs so different lock keys
         String r1 = testService.spelKeyMethod(1);
