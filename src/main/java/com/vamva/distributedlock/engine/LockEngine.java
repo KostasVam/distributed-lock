@@ -105,7 +105,7 @@ public class LockEngine {
     /**
      * Acquires a lock, retrying with exponential backoff until timeout.
      *
-     * <p>If {@link LockRequest#getWaitTimeoutMs()} is zero or negative,
+     * <p>If {@code waitTimeoutMs} is zero or negative,
      * delegates to {@link #tryAcquire(LockRequest)}.</p>
      *
      * @param request the lock request

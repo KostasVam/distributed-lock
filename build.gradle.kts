@@ -42,6 +42,12 @@ tasks.test {
     useJUnitPlatform()
 }
 
+tasks.javadoc {
+    (options as StandardJavadocDocletOptions).apply {
+        addStringOption("Xdoclint:none", "-quiet")
+    }
+}
+
 // Library JAR: exclude demo app classes, produce plain JAR for consumers
 tasks.jar {
     enabled = true
