@@ -14,8 +14,8 @@ The distributed lock provides **best-effort mutual exclusion** under a lease mod
 
 | Scenario | Risk | Mitigation |
 |---|---|---|
-| GC pause > lease duration | Stale owner continues after expiry | Short leases + frequent renew |
-| Network partition | Owner loses Redis connectivity, lease expires | Fencing tokens (future) |
+| GC pause > lease duration | Stale owner continues after expiry | Short leases + frequent renew + fencing tokens |
+| Network partition | Owner loses Redis connectivity, lease expires | Fencing tokens (pass to downstream) |
 | Clock skew | Lease duration perceived differently | Use Redis server TTL, not client clock |
 
 ## Threat Model
@@ -29,7 +29,7 @@ The distributed lock provides **best-effort mutual exclusion** under a lease mod
 **Mitigations:**
 - Short lease durations (10-30s) with frequent renewal
 - Design downstream operations to be idempotent
-- Fencing tokens (planned for v2): monotonically increasing token; downstream systems reject writes with stale tokens
+- Fencing tokens: each acquisition returns a monotonically increasing token; downstream systems reject writes with stale tokens (see `LockResult.getFencingToken()`)
 - Check lock ownership before committing results
 
 **Residual risk:** Medium — inherent to lease-based systems.

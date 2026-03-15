@@ -49,7 +49,7 @@ A Spring Boot library that provides distributed mutual exclusion using Redis as 
 - [x] Input validation on all API operations
 - [x] Health indicator for backend status (`/actuator/health`)
 - [x] `TokenGenerator` interface for pluggable token strategies
-- [x] Lua scripts distinguish key-not-found vs token-mismatch
+- [x] Lua scripts distinguish key-not-found vs token-mismatch (release/renew)
 - [x] Bean Validation on configuration properties (`@Min`, `@Valid`)
 - [x] Chaos tests (Redis stop/pause/recovery with circuit breaker)
 - [x] Fencing tokens (monotonically increasing via Redis INCR)

@@ -211,6 +211,24 @@ class DistributedLockIntegrationTest {
     }
 
     @Test
+    void executeWithLockReleasesOnException() {
+        LockRequest request = LockRequest.builder()
+                .resourceKey("integration:test:exception")
+                .leaseMs(30_000)
+                .build();
+
+        assertThrows(RuntimeException.class, () ->
+                lockClient.executeWithLock(request, () -> {
+                    throw new RuntimeException("Task failed");
+                }));
+
+        // Lock should be released despite exception
+        LockResult retry = lockClient.tryAcquire(request);
+        assertTrue(retry.isAcquired(), "Lock should be released after task exception");
+        lockClient.release(retry.getResourceKey(), retry.getLockToken());
+    }
+
+    @Test
     void acquireWithTimeoutSucceeds() throws InterruptedException {
         LockRequest holdRequest = LockRequest.builder()
                 .resourceKey("integration:test:9")
