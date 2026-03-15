@@ -137,7 +137,7 @@ class LuaScriptContractTest {
             Long result = redisTemplate.execute(releaseScript,
                     Collections.singletonList("lock:release:2"), "token-wrong");
 
-            assertEquals(0L, result, "Non-owner should not release");
+            assertEquals(-1L, result, "Non-owner should get token mismatch");
             assertNotNull(redisTemplate.opsForValue().get("lock:release:2"), "Key should still exist");
         }
 
@@ -185,7 +185,7 @@ class LuaScriptContractTest {
             Long result = redisTemplate.execute(renewScript,
                     Collections.singletonList("lock:renew:2"), "token-wrong", "60000");
 
-            assertEquals(0L, result, "Non-owner should not renew");
+            assertEquals(-1L, result, "Non-owner should get token mismatch");
         }
 
         @Test

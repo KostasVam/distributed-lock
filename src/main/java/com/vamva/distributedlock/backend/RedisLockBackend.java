@@ -74,6 +74,9 @@ public class RedisLockBackend implements LockBackend {
         return executeWithCircuitBreaker(() -> {
             Long result = redisTemplate.execute(releaseScript,
                     Collections.singletonList(key), token);
+            if (result != null && result == -1L) {
+                log.debug("Release rejected: token mismatch for key={}", key);
+            }
             return result != null && result == 1L;
         }, "release");
     }
@@ -83,6 +86,9 @@ public class RedisLockBackend implements LockBackend {
         return executeWithCircuitBreaker(() -> {
             Long result = redisTemplate.execute(renewScript,
                     Collections.singletonList(key), token, String.valueOf(leaseMs));
+            if (result != null && result == -1L) {
+                log.debug("Renew rejected: token mismatch for key={}", key);
+            }
             return result != null && result == 1L;
         }, "renew");
     }

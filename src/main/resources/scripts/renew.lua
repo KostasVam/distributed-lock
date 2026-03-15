@@ -3,9 +3,13 @@
 -- ARGV[1] = owner token
 -- ARGV[2] = new lease duration in milliseconds
 --
--- Returns: 1 if renewed, 0 if not owner or key missing
+-- Returns: 1 if renewed, 0 if key missing, -1 if token mismatch
 
-if redis.call('GET', KEYS[1]) == ARGV[1] then
+local current = redis.call('GET', KEYS[1])
+if current == false then
+    return 0
+end
+if current == ARGV[1] then
     return redis.call('PEXPIRE', KEYS[1], ARGV[2])
 end
-return 0
+return -1
