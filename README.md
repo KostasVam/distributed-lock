@@ -182,7 +182,7 @@ This is inherent to lease-based distributed locking.
 ### Mitigation Strategies
 
 - Short leases with frequent renewal
-- Fencing tokens (future feature)
+- Fencing tokens (pass `LockResult.getFencingToken()` to downstream systems to reject stale writes)
 - Idempotent downstream operations
 - Design critical sections to tolerate duplicate execution
 
