@@ -64,11 +64,7 @@ public class LockEngine {
         String key = formatKey(resourceKey);
         String keyHash = hashResourceKey(resourceKey);
 
-        Observation observation = Observation.createNotStarted("lock.acquire", observationRegistry)
-                .lowCardinalityKeyValue("backend", properties.getBackend())
-                .lowCardinalityKeyValue("result", "pending")
-                .highCardinalityKeyValue("resource_group", extractResourceGroup(resourceKey))
-                .start();
+        Observation observation = startObservation("acquire", resourceKey);
 
         metrics.recordAcquireAttempt();
         long start = System.nanoTime();
@@ -130,11 +126,7 @@ public class LockEngine {
         long attempt = 0;
         long contentionStart = System.nanoTime();
 
-        Observation observation = Observation.createNotStarted("lock.acquire", observationRegistry)
-                .lowCardinalityKeyValue("backend", properties.getBackend())
-                .lowCardinalityKeyValue("result", "pending")
-                .highCardinalityKeyValue("resource_group", extractResourceGroup(resourceKey))
-                .start();
+        Observation observation = startObservation("acquire", resourceKey);
 
         log.info("operation=acquire_with_timeout resource_key_hash={} owner_id={} lease_ms={} wait_timeout_ms={} backend={}",
                 keyHash, ownerId, leaseMs, request.getWaitTimeoutMs(), properties.getBackend());
@@ -199,11 +191,7 @@ public class LockEngine {
         String key = formatKey(resourceKey);
         String keyHash = hashResourceKey(resourceKey);
 
-        Observation observation = Observation.createNotStarted("lock.renew", observationRegistry)
-                .lowCardinalityKeyValue("backend", properties.getBackend())
-                .lowCardinalityKeyValue("result", "pending")
-                .highCardinalityKeyValue("resource_group", extractResourceGroup(resourceKey))
-                .start();
+        Observation observation = startObservation("renew", resourceKey);
 
         log.info("operation=renew_attempt resource_key_hash={} token={} lease_ms={} backend={}",
                 keyHash, token, leaseMs, properties.getBackend());
@@ -245,11 +233,7 @@ public class LockEngine {
         String key = formatKey(resourceKey);
         String keyHash = hashResourceKey(resourceKey);
 
-        Observation observation = Observation.createNotStarted("lock.release", observationRegistry)
-                .lowCardinalityKeyValue("backend", properties.getBackend())
-                .lowCardinalityKeyValue("result", "pending")
-                .highCardinalityKeyValue("resource_group", extractResourceGroup(resourceKey))
-                .start();
+        Observation observation = startObservation("release", resourceKey);
 
         log.info("operation=release_attempt resource_key_hash={} token={} backend={}",
                 keyHash, token, properties.getBackend());
@@ -328,6 +312,14 @@ public class LockEngine {
             // SHA-256 is always available in Java
             return resourceKey;
         }
+    }
+
+    private Observation startObservation(String operationName, String resourceKey) {
+        return Observation.createNotStarted("lock." + operationName, observationRegistry)
+                .lowCardinalityKeyValue("backend", properties.getBackend())
+                .lowCardinalityKeyValue("result", "pending")
+                .highCardinalityKeyValue("resource_group", extractResourceGroup(resourceKey))
+                .start();
     }
 
     private void validateRequest(LockRequest request) {
