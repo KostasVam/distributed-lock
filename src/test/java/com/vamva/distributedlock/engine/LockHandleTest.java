@@ -41,9 +41,9 @@ class LockHandleTest {
         LockHandle handle = new LockHandle(result, engine, registry);
         registry.register(handle);
 
-        assertTrue(handle.isAcquired());
+        assertTrue(handle.isHeld());
         handle.close();
-        assertFalse(handle.isAcquired());
+        assertFalse(handle.isHeld());
 
         // Lock should be free now
         LockResult reacquire = engine.tryAcquire(LockRequest.builder()
@@ -69,7 +69,7 @@ class LockHandleTest {
 
         try (LockHandle handle = new LockHandle(result, engine, registry)) {
             registry.register(handle);
-            assertTrue(handle.isAcquired());
+            assertTrue(handle.isHeld());
         }
 
         // Lock should be free
@@ -91,7 +91,7 @@ class LockHandleTest {
         // Wait longer than original lease — auto-renewal should keep it alive
         Thread.sleep(800);
 
-        assertTrue(handle.isAcquired(), "Lock should still be acquired via auto-renewal");
+        assertTrue(handle.isHeld(), "Lock should still be acquired via auto-renewal");
 
         // Another client should not be able to acquire
         LockResult blocked = engine.tryAcquire(LockRequest.builder()

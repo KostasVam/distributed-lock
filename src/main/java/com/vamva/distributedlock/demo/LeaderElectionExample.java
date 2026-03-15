@@ -47,7 +47,7 @@ public class LeaderElectionExample {
     }
 
     public boolean isLeader() {
-        return leaderLock != null && leaderLock.isAcquired();
+        return leaderLock != null && leaderLock.isHeld();
     }
 
     /**

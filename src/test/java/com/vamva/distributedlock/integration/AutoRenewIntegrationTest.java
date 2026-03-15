@@ -41,7 +41,7 @@ class AutoRenewIntegrationTest {
                 .leaseMs(1_000) // 1 second lease
                 .build())) {
 
-            assertTrue(handle.isAcquired());
+            assertTrue(handle.isHeld());
 
             // Wait 2x the lease — without auto-renew, lock would have expired
             Thread.sleep(2_500);
@@ -92,7 +92,7 @@ class AutoRenewIntegrationTest {
             assertEquals("autorenew:test:3", handle.getResourceKey());
             assertNotNull(handle.getLockToken());
             assertTrue(handle.getFencingToken() > 0);
-            assertTrue(handle.isAcquired());
+            assertTrue(handle.isHeld());
         }
     }
 }
