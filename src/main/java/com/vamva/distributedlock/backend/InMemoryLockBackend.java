@@ -1,7 +1,6 @@
 package com.vamva.distributedlock.backend;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Clock;
 import java.util.concurrent.ConcurrentHashMap;
@@ -81,7 +80,11 @@ public class InMemoryLockBackend implements LockBackend {
         return renewed[0];
     }
 
-    @Scheduled(fixedRate = 60_000)
+    /**
+     * Removes expired lock entries to prevent memory leaks.
+     * Called periodically by the host application if scheduling is enabled,
+     * or can be invoked manually.
+     */
     public void cleanup() {
         long now = clock.millis();
         int removed = 0;

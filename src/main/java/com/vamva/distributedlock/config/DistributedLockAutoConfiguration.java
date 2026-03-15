@@ -18,7 +18,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.time.Clock;
 
@@ -37,7 +36,6 @@ import java.time.Clock;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(DistributedLockProperties.class)
-@EnableScheduling
 @ConditionalOnProperty(prefix = "distributed-lock", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DistributedLockAutoConfiguration {
 
