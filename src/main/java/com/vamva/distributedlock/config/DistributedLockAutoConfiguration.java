@@ -1,10 +1,12 @@
 package com.vamva.distributedlock.config;
 
+import com.vamva.distributedlock.annotation.DistributedLockAspect;
 import com.vamva.distributedlock.api.DistributedLockClient;
 import com.vamva.distributedlock.backend.InMemoryLockBackend;
 import com.vamva.distributedlock.backend.LockBackend;
 import com.vamva.distributedlock.backend.RedisLockBackend;
 import com.vamva.distributedlock.engine.LockEngine;
+import com.vamva.distributedlock.engine.LockRegistry;
 import com.vamva.distributedlock.metrics.LockMetrics;
 import com.vamva.distributedlock.token.TokenGenerator;
 import com.vamva.distributedlock.token.UuidTokenGenerator;
@@ -110,11 +112,27 @@ public class DistributedLockAutoConfiguration {
         return new DistributedLockHealthIndicator(backend, properties.getBackend());
     }
 
+    // ── Registry ──────────────────────────────────────────────────────────
+
+    @Bean
+    @ConditionalOnMissingBean(LockRegistry.class)
+    public LockRegistry lockRegistry() {
+        return new LockRegistry();
+    }
+
     // ── Client API ───────────────────────────────────────────────────────
 
     @Bean
     @ConditionalOnMissingBean(DistributedLockClient.class)
-    public DistributedLockClient distributedLockClient(LockEngine engine) {
-        return new DistributedLockClient(engine);
+    public DistributedLockClient distributedLockClient(LockEngine engine, LockRegistry registry) {
+        return new DistributedLockClient(engine, registry);
+    }
+
+    // ── Annotation Support ───────────────────────────────────────────────
+
+    @Bean
+    @ConditionalOnMissingBean(DistributedLockAspect.class)
+    public DistributedLockAspect distributedLockAspect(DistributedLockClient lockClient) {
+        return new DistributedLockAspect(lockClient);
     }
 }
