@@ -56,6 +56,7 @@ public class LockEngine {
      * @return the lock result
      */
     public LockResult tryAcquire(LockRequest request) {
+        validateRequest(request);
         String resourceKey = request.getResourceKey();
         long leaseMs = resolveLeaseMs(request);
         String ownerId = resolveOwnerId(request);
@@ -113,6 +114,7 @@ public class LockEngine {
      * @throws InterruptedException if the thread is interrupted while waiting
      */
     public LockResult acquire(LockRequest request) throws InterruptedException {
+        validateRequest(request);
         if (request.getWaitTimeoutMs() <= 0) {
             return tryAcquire(request);
         }
@@ -192,6 +194,8 @@ public class LockEngine {
      * @return {@code true} if renewed
      */
     public boolean renew(String resourceKey, String token, long leaseMs) {
+        validateResourceKey(resourceKey);
+        validateToken(token);
         String key = formatKey(resourceKey);
         String keyHash = hashResourceKey(resourceKey);
 
@@ -236,6 +240,8 @@ public class LockEngine {
      * @return {@code true} if released
      */
     public boolean release(String resourceKey, String token) {
+        validateResourceKey(resourceKey);
+        validateToken(token);
         String key = formatKey(resourceKey);
         String keyHash = hashResourceKey(resourceKey);
 
@@ -321,6 +327,27 @@ public class LockEngine {
         } catch (NoSuchAlgorithmException e) {
             // SHA-256 is always available in Java
             return resourceKey;
+        }
+    }
+
+    private void validateRequest(LockRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("LockRequest must not be null");
+        }
+        if (request.getResourceKey() == null || request.getResourceKey().isBlank()) {
+            throw new IllegalArgumentException("resourceKey must not be blank");
+        }
+    }
+
+    private void validateToken(String token) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("token must not be blank");
+        }
+    }
+
+    private void validateResourceKey(String resourceKey) {
+        if (resourceKey == null || resourceKey.isBlank()) {
+            throw new IllegalArgumentException("resourceKey must not be blank");
         }
     }
 

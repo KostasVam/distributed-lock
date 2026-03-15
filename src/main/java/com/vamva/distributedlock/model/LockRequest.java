@@ -1,5 +1,6 @@
 package com.vamva.distributedlock.model;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -13,7 +14,8 @@ import lombok.Getter;
 @Builder
 public class LockRequest {
 
-    /** The resource key to lock (e.g., "job:daily-settlement"). */
+    /** The resource key to lock (e.g., "job:daily-settlement"). Must not be blank. */
+    @NotBlank(message = "resourceKey must not be blank")
     private final String resourceKey;
 
     /**
