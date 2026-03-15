@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Clock;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -132,5 +133,80 @@ class LockHandleTest {
         assertNotNull(handle.getLockToken());
         assertTrue(handle.getFencingToken() > 0);
         assertEquals(result, handle.getLockResult());
+        assertEquals(LockHandle.State.HELD, handle.getState());
+    }
+
+    @Test
+    void stateTransitionsToLostWhenRenewalFails() throws InterruptedException {
+        // Acquire with very short lease, don't renew from engine side
+        LockResult result = engine.tryAcquire(LockRequest.builder()
+                .resourceKey("handle:test:lost:1").leaseMs(100).build());
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        LockHandle handle = new LockHandle(result, engine, registry);
+        registry.register(handle);
+        // Start renewal at 50ms interval, but lease is only 100ms.
+        // After lease expires, another client could acquire, causing renewal to fail.
+        handle.startAutoRenewal(50, 100, scheduler);
+
+        // Release the lock externally to simulate another client taking it
+        engine.release(result.getResourceKey(), result.getLockToken());
+
+        // Wait for renewal to detect loss
+        Thread.sleep(300);
+
+        assertEquals(LockHandle.State.LOST, handle.getState(), "State should be LOST after renewal failure");
+        assertFalse(handle.isHeld());
+
+        handle.close();
+        assertEquals(LockHandle.State.RELEASED, handle.getState());
+        scheduler.shutdownNow();
+    }
+
+    @Test
+    void onLockLostCallbackInvokedOnLoss() throws InterruptedException {
+        LockResult result = engine.tryAcquire(LockRequest.builder()
+                .resourceKey("handle:test:lost:2").leaseMs(100).build());
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        LockHandle handle = new LockHandle(result, engine, registry);
+        registry.register(handle);
+
+        AtomicReference<String> lostKey = new AtomicReference<>();
+        handle.onLockLost(lostKey::set);
+        handle.startAutoRenewal(50, 100, scheduler);
+
+        // Release externally
+        engine.release(result.getResourceKey(), result.getLockToken());
+
+        Thread.sleep(300);
+
+        assertEquals("handle:test:lost:2", lostKey.get(), "Callback should receive resource key");
+        assertEquals(LockHandle.State.LOST, handle.getState());
+
+        handle.close();
+        scheduler.shutdownNow();
+    }
+
+    @Test
+    void closeFromLostStateSkipsRelease() throws InterruptedException {
+        LockResult result = engine.tryAcquire(LockRequest.builder()
+                .resourceKey("handle:test:lost:3").leaseMs(100).build());
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        LockHandle handle = new LockHandle(result, engine, registry);
+        registry.register(handle);
+        handle.startAutoRenewal(50, 100, scheduler);
+
+        // Release externally
+        engine.release(result.getResourceKey(), result.getLockToken());
+        Thread.sleep(300);
+
+        assertEquals(LockHandle.State.LOST, handle.getState());
+
+        // Close should not throw and should transition to RELEASED
+        assertDoesNotThrow(handle::close);
+        assertEquals(LockHandle.State.RELEASED, handle.getState());
+        scheduler.shutdownNow();
     }
 }

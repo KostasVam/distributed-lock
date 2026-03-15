@@ -227,4 +227,27 @@ class LockEngineTest {
         // Actually attempt is 1-indexed in usage, but 0 works fine here
         assertTrue(backoff0 >= 100 && backoff0 <= 500);
     }
+
+    @Test
+    void retryDisabledForceSingleAttemptEvenWithTimeout() throws InterruptedException {
+        properties.getRetry().setEnabled(false);
+
+        // Hold a lock
+        engine.tryAcquire(LockRequest.builder()
+                .resourceKey("job:test-retry-disabled")
+                .leaseMs(60_000)
+                .build());
+
+        // Try acquire with timeout — should NOT retry, just single attempt
+        long start = System.currentTimeMillis();
+        LockResult result = engine.acquire(LockRequest.builder()
+                .resourceKey("job:test-retry-disabled")
+                .leaseMs(30_000)
+                .waitTimeoutMs(5_000) // 5s timeout — but retry disabled
+                .build());
+        long elapsed = System.currentTimeMillis() - start;
+
+        assertFalse(result.isAcquired());
+        assertTrue(elapsed < 1_000, "Should return immediately (single attempt), not wait 5s");
+    }
 }

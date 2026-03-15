@@ -107,4 +107,20 @@ class AnnotationIntegrationTest {
         assertEquals("executed-2", r2);
         assertEquals(2, testService.getExecutionCount());
     }
+
+    @Test
+    void autoRenewKeepsLockDuringLongMethod() throws InterruptedException {
+        // Method runs 2.5s with 1s lease — autoRenew=true keeps it alive
+        String result = testService.autoRenewMethod();
+        assertEquals("completed", result);
+        assertEquals(1, testService.getExecutionCount());
+
+        // Lock should be released after method returns
+        LockResult free = lockClient.tryAcquire(LockRequest.builder()
+                .resourceKey("annotation:test:autorenew")
+                .leaseMs(30_000)
+                .build());
+        assertTrue(free.isAcquired(), "Lock should be free after autoRenew method completes");
+        lockClient.release(free.getResourceKey(), free.getLockToken());
+    }
 }

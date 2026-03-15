@@ -28,6 +28,13 @@ public class AnnotatedTestService {
         Thread.sleep(200);
     }
 
+    @DistributedLock(key = "'annotation:test:autorenew'", leaseMs = 1000, autoRenew = true)
+    public String autoRenewMethod() throws InterruptedException {
+        executionCount.incrementAndGet();
+        Thread.sleep(2_500); // runs longer than lease — auto-renew keeps it alive
+        return "completed";
+    }
+
     @DistributedLock(key = "#name", leaseMs = 30000)
     public String nullableKeyMethod(String name) {
         executionCount.incrementAndGet();
