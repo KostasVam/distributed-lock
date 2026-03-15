@@ -44,5 +44,5 @@ Failing open would defeat the purpose of the lock.
 ### Operational Guidance
 
 - **Monitor** `distributed_lock_backend_errors_total` and alert on sustained non-zero values
-- **Fail-open** mode is available via `distributed-lock.fail-open: true` for non-critical lock use cases
+- **Fail-open** mode is available via `distributed-lock.fail-open: true` for non-critical lock use cases. When enabled, backend unavailability returns a synthetic success with `fencingToken=0`, indicating unverified acquisition. Use with extreme caution.
 - Deploy Redis with Sentinel or Cluster for high availability

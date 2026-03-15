@@ -35,6 +35,8 @@ public class LeaderElectionExample {
                     .resourceKey("leader:notification-service")
                     .leaseMs(15_000) // 15s lease, auto-renewed every ~10s
                     .build());
+            leaderLock.onLockLost(key ->
+                    log.warn("LEADERSHIP LOST for {} — transitioning to follower", key));
             log.info("This instance is now the LEADER (fence={})", leaderLock.getFencingToken());
             return true;
         } catch (LockAcquisitionException e) {

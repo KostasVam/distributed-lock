@@ -51,7 +51,7 @@ public class SchedulerSingletonExample {
      * Simple method with declarative locking via annotation.
      * No manual acquire/release needed.
      */
-    @DistributedLock(key = "'scheduler:notifications'", leaseMs = 60_000)
+    @DistributedLock(key = "'scheduler:notifications'", leaseMs = 60_000, autoRenew = true)
     public void sendNotifications() {
         log.info("Sending notifications (only one instance runs this)");
         // ... notification logic ...

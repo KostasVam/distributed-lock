@@ -57,7 +57,7 @@ The distributed lock provides **best-effort mutual exclusion** under a lease mod
 **Mitigations:**
 - Document recommended lease durations (10-60s)
 - Use `defaultLeaseMs` in configuration to enforce organization defaults
-- Auto-renew helper (planned for v2) for long-running tasks
+- Use `acquireWithAutoRenew()` or `@DistributedLock(autoRenew=true)` for long-running tasks
 
 **Residual risk:** Low — operational discipline.
 

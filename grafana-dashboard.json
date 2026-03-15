@@ -127,13 +127,13 @@
       ]
     },
     {
-      "title": "Latest Fencing Tokens",
+      "title": "Fencing Tokens Issued",
       "type": "stat",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "targets": [
         {
-          "expr": "distributed_lock_fencing_token_latest",
-          "legendFormat": "{{resource_key}}"
+          "expr": "increase(distributed_lock_fencing_tokens_issued_total[5m])",
+          "legendFormat": "issued"
         }
       ]
     }

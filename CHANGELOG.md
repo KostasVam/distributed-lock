@@ -30,11 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lua scripts distinguish key-not-found vs token-mismatch (return codes 0, 1, -1)
 - Resilience4j circuit breaker around all Redis calls
 - Prometheus metrics via Micrometer with low-cardinality labels (operation, result, backend)
-- Fencing token gauge metric (`distributed_lock_fencing_token_latest`)
+- Fencing tokens issued counter (`distributed_lock_fencing_tokens_issued_total`)
 - Micrometer Observation tracing spans (lock.acquire, lock.renew, lock.release)
-- Structured logging with SHA-256 hashed resource keys
-- Spring Boot Starter packaging with auto-configuration (no component scanning required)
-- Spring AOP integration for `@DistributedLock` annotation
+- Structured logging with SHA-256 hashed resource keys and truncated tokens
+- Lightweight Spring Boot Starter (no web dependency, no global @EnableScheduling)
+- `@DistributedLock` annotation with SpEL keys and `autoRenew` attribute
+- `LockHandle` state model: HELD → LOST → RELEASED with `onLockLost()` callback
+- Fail-open mode returns synthetic success (fencingToken=0) when backend is unavailable
+- `retry.enabled` config is authoritative (false disables retries even with waitTimeoutMs)
 - GitHub Actions CI pipeline with Redis service container
 - Usage examples: batch-job, scheduler-singleton, leader-election
 - Comprehensive test suite: unit, Lua contract, integration, annotation, auto-renew, fencing, chaos

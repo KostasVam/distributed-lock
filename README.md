@@ -191,7 +191,8 @@ This is inherent to lease-based distributed locking.
 ```yaml
 distributed-lock:
   enabled: true
-  fail-open: false                    # fail-closed: acquisition fails when Redis is down
+  fail-open: false                    # false=fail-closed (acquisition fails when Redis is down)
+                                      # true=fail-open (returns synthetic success with fence=0, USE WITH CAUTION)
   backend: redis                      # redis | in-memory
   default-lease-ms: 30000            # fallback when LockRequest doesn't specify
   owner-id: ${spring.application.name:my-service}
@@ -218,7 +219,7 @@ distributed-lock:
 | `distributed_lock_backend_errors_total` | Counter | `operation`, `backend` |
 | `distributed_lock_acquire_duration_ms` | Timer | `backend` |
 | `distributed_lock_contention_wait_ms` | Timer | `backend` |
-| `distributed_lock_fencing_token_latest` | Gauge | `backend` |
+| `distributed_lock_fencing_tokens_issued_total` | Counter | `operation`, `backend` |
 
 Metrics endpoint: `GET /actuator/prometheus`
 
