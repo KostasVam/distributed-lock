@@ -62,7 +62,7 @@ public class RedisLockBackend implements LockBackend {
 
     @Override
     public long acquire(String key, String token, long leaseMs) {
-        return executeWithCircuitBreaker(() -> {
+        return acquireWithFailover(() -> {
             String fenceKey = key + ":fence";
             List result = redisTemplate.execute(acquireScript,
                     Arrays.asList(key, fenceKey), token, String.valueOf(leaseMs));
@@ -70,7 +70,7 @@ public class RedisLockBackend implements LockBackend {
                 return ((Number) result.get(1)).longValue();
             }
             return -1L;
-        }, "acquire", -1L);
+        });
     }
 
     @Override
@@ -82,7 +82,7 @@ public class RedisLockBackend implements LockBackend {
                 log.debug("Release rejected: token mismatch for key={}", key);
             }
             return result != null && result == 1L;
-        }, "release", false);
+        }, "release");
     }
 
     @Override
@@ -94,16 +94,30 @@ public class RedisLockBackend implements LockBackend {
                 log.debug("Renew rejected: token mismatch for key={}", key);
             }
             return result != null && result == 1L;
-        }, "renew", false);
+        }, "renew");
     }
 
-    private <T> T executeWithCircuitBreaker(Supplier<T> operation, String operationName, T failureValue) {
+    private long acquireWithFailover(Supplier<Long> operation) {
+        try {
+            return circuitBreaker.executeSupplier(operation);
+        } catch (Exception e) {
+            log.error("Redis acquire failed (circuit={}): {}", circuitBreaker.getState(), e.getMessage());
+            metrics.recordBackendError();
+            if (failOpen) {
+                log.warn("Fail-open: allowing lock acquisition despite backend error");
+                return 0L; // synthetic success with fence=0 (caller should treat as unverified)
+            }
+            return -1L;
+        }
+    }
+
+    private boolean executeWithCircuitBreaker(Supplier<Boolean> operation, String operationName) {
         try {
             return circuitBreaker.executeSupplier(operation);
         } catch (Exception e) {
             log.error("Redis {} failed (circuit={}): {}", operationName, circuitBreaker.getState(), e.getMessage());
             metrics.recordBackendError();
-            return failureValue;
+            return false;
         }
     }
 
