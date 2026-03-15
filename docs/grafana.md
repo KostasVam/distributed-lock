@@ -11,7 +11,14 @@
 | **Contention Wait** | Time series | p50/p95/p99 of time spent waiting in acquire-with-timeout |
 | **Backend Errors** | Stat | Redis error count over 5 minutes |
 | **Acquire Success Ratio** | Gauge | Success / (Success + Failed) over 5 minutes |
-| **Operations by Backend** | Pie chart | Distribution of operations across redis/in-memory |
+| **Fencing Tokens** | Stat | Latest fencing token per resource key (contention indicator) |
+
+### Import
+
+1. Open Grafana → Dashboards → Import
+2. Upload `grafana-dashboard.json` from the project root
+3. Select your Prometheus data source
+4. Click Import
 
 ## Dashboard Layout
 
@@ -56,6 +63,13 @@ rate(distributed_lock_backend_errors_total[1m])
 ```promql
 histogram_quantile(0.99, rate(distributed_lock_contention_wait_ms_bucket[5m]))
 ```
+
+### Latest Fencing Token
+```promql
+distributed_lock_fencing_token_latest
+```
+
+High fencing token values with frequent increments indicate contention on a resource key.
 
 ## Alerting Recommendations
 

@@ -218,6 +218,7 @@ distributed-lock:
 | `distributed_lock_backend_errors_total` | Counter | `operation`, `backend` |
 | `distributed_lock_acquire_duration_ms` | Timer | `backend` |
 | `distributed_lock_contention_wait_ms` | Timer | `backend` |
+| `distributed_lock_fencing_token_latest` | Gauge | `backend` |
 
 Metrics endpoint: `GET /actuator/prometheus`
 
