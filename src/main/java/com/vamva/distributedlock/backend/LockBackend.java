@@ -25,6 +25,15 @@ package com.vamva.distributedlock.backend;
  */
 public interface LockBackend {
 
+    /** Return value indicating lock is held by another client. */
+    long RESULT_CONTENDED = -1L;
+
+    /** Return value indicating backend is unavailable. */
+    long RESULT_BACKEND_UNAVAILABLE = -2L;
+
+    /** Return value indicating fail-open synthetic success (unverified). */
+    long RESULT_FAIL_OPEN = 0L;
+
     /**
      * Attempts to acquire a lock atomically, returning a fencing token on success.
      *

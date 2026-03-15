@@ -69,7 +69,7 @@ public class RedisLockBackend implements LockBackend {
             if (result != null && result.size() >= 2 && ((Number) result.get(0)).longValue() == 1L) {
                 return ((Number) result.get(1)).longValue();
             }
-            return -1L;
+            return RESULT_CONTENDED;
         });
     }
 
@@ -105,9 +105,9 @@ public class RedisLockBackend implements LockBackend {
             metrics.recordBackendError();
             if (failOpen) {
                 log.warn("Fail-open: allowing lock acquisition despite backend error");
-                return 0L; // synthetic success with fence=0 (caller should treat as unverified)
+                return RESULT_FAIL_OPEN;
             }
-            return -1L;
+            return RESULT_BACKEND_UNAVAILABLE;
         }
     }
 

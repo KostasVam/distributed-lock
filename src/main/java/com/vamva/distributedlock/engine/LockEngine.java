@@ -3,6 +3,7 @@ package com.vamva.distributedlock.engine;
 import com.vamva.distributedlock.backend.LockBackend;
 import com.vamva.distributedlock.config.DistributedLockProperties;
 import com.vamva.distributedlock.metrics.LockMetrics;
+import com.vamva.distributedlock.model.AcquireOutcome;
 import com.vamva.distributedlock.model.LockRequest;
 import com.vamva.distributedlock.model.LockResult;
 import com.vamva.distributedlock.token.TokenGenerator;
@@ -77,21 +78,8 @@ public class LockEngine {
             long durationNanos = System.nanoTime() - start;
             metrics.recordAcquireDuration(durationNanos);
 
-            if (fencingToken >= 0) {
-                long expiresAt = clock.millis() + leaseMs;
-                metrics.recordAcquireSuccess();
-                metrics.recordFencingTokenIssued();
-                observation.lowCardinalityKeyValue("result", "success");
-                log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} fence={} lease_ms={} backend={}",
-                        keyHash, ownerId, truncateToken(token), fencingToken, leaseMs, properties.getBackend());
-                return LockResult.success(resourceKey, token, leaseMs, expiresAt, fencingToken);
-            }
-
-            metrics.recordAcquireFailed();
-            observation.lowCardinalityKeyValue("result", "failed");
-            log.info("operation=acquire_failed resource_key_hash={} owner_id={} reason=already_held backend={}",
-                    keyHash, ownerId, properties.getBackend());
-            return LockResult.failure(resourceKey);
+            return handleAcquireResult(fencingToken, resourceKey, token, leaseMs, ownerId,
+                    keyHash, observation, 1);
         } catch (Exception e) {
             observation.error(e);
             throw e;
@@ -140,16 +128,11 @@ public class LockEngine {
                 long fencingToken = backend.acquire(key, token, leaseMs);
                 metrics.recordAcquireDuration(System.nanoTime() - start);
 
-                if (fencingToken >= 0) {
-                    long expiresAt = clock.millis() + leaseMs;
-                    metrics.recordAcquireSuccess();
-                    metrics.recordFencingTokenIssued();
+                if (fencingToken > 0 || fencingToken == LockBackend.RESULT_FAIL_OPEN) {
                     metrics.recordContentionWait(System.nanoTime() - contentionStart);
-                    observation.lowCardinalityKeyValue("result", "success")
-                            .highCardinalityKeyValue("retry_count", String.valueOf(attempt));
-                    log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} fence={} lease_ms={} attempts={} backend={}",
-                            keyHash, ownerId, token, fencingToken, leaseMs, attempt + 1, properties.getBackend());
-                    return LockResult.success(resourceKey, token, leaseMs, expiresAt, fencingToken);
+                    observation.highCardinalityKeyValue("retry_count", String.valueOf(attempt));
+                    return handleAcquireResult(fencingToken, resourceKey, token, leaseMs, ownerId,
+                            keyHash, observation, attempt + 1);
                 }
 
                 attempt++;
@@ -170,7 +153,7 @@ public class LockEngine {
                     .highCardinalityKeyValue("retry_count", String.valueOf(attempt));
             log.info("operation=acquire_timeout resource_key_hash={} owner_id={} attempts={} backend={}",
                     keyHash, ownerId, attempt, properties.getBackend());
-            return LockResult.failure(resourceKey);
+            return LockResult.timeout(resourceKey);
         } catch (Exception e) {
             observation.error(e);
             throw e;
@@ -314,6 +297,47 @@ public class LockEngine {
             // SHA-256 is always available in Java
             return resourceKey;
         }
+    }
+
+    private LockResult handleAcquireResult(long fencingToken, String resourceKey, String token,
+                                              long leaseMs, String ownerId, String keyHash,
+                                              Observation observation, long attempts) {
+        if (fencingToken == LockBackend.RESULT_FAIL_OPEN) {
+            long expiresAt = clock.millis() + leaseMs;
+            metrics.recordAcquireSuccess();
+            metrics.recordFailOpenAcquire();
+            observation.lowCardinalityKeyValue("result", "fail_open_synthetic");
+            log.warn("operation=acquire_fail_open resource_key_hash={} owner_id={} lease_ms={} backend={} WARNING=unverified_ownership",
+                    keyHash, ownerId, leaseMs, properties.getBackend());
+            return LockResult.failOpenSynthetic(resourceKey, token, leaseMs, expiresAt);
+        }
+
+        if (fencingToken > 0) {
+            long expiresAt = clock.millis() + leaseMs;
+            metrics.recordAcquireSuccess();
+            metrics.recordFencingTokenIssued();
+            observation.lowCardinalityKeyValue("result", "success");
+            log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} fence={} lease_ms={} attempts={} backend={}",
+                    keyHash, ownerId, truncateToken(token), fencingToken, leaseMs, attempts, properties.getBackend());
+            return LockResult.acquired(resourceKey, token, leaseMs, expiresAt, fencingToken);
+        }
+
+        if (fencingToken == LockBackend.RESULT_BACKEND_UNAVAILABLE) {
+            metrics.recordAcquireFailed();
+            metrics.recordBackendUnavailable();
+            observation.lowCardinalityKeyValue("result", "backend_unavailable");
+            log.error("operation=acquire_backend_unavailable resource_key_hash={} owner_id={} backend={}",
+                    keyHash, ownerId, properties.getBackend());
+            return LockResult.backendUnavailable(resourceKey);
+        }
+
+        // RESULT_CONTENDED (-1)
+        metrics.recordAcquireFailed();
+        metrics.recordAcquireContention();
+        observation.lowCardinalityKeyValue("result", "contended");
+        log.info("operation=acquire_contended resource_key_hash={} owner_id={} backend={}",
+                keyHash, ownerId, properties.getBackend());
+        return LockResult.contended(resourceKey);
     }
 
     private Observation startObservation(String operationName, String resourceKey) {
