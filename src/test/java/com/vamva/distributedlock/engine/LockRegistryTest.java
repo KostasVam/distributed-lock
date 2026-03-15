@@ -19,6 +19,7 @@ class LockRegistryTest {
 
     private LockEngine engine;
     private LockRegistry registry;
+    private LockMetrics metrics;
 
     @BeforeEach
     void setUp() {
@@ -26,7 +27,7 @@ class LockRegistryTest {
         DistributedLockProperties properties = new DistributedLockProperties();
         properties.setBackend("in-memory");
         properties.setDefaultLeaseMs(30_000);
-        LockMetrics metrics = new LockMetrics(new SimpleMeterRegistry(), "in-memory");
+        metrics = new LockMetrics(new SimpleMeterRegistry(), "in-memory");
         engine = new LockEngine(backend, new UuidTokenGenerator(), metrics,
                 Clock.systemUTC(), properties, ObservationRegistry.NOOP);
         registry = new LockRegistry();
@@ -38,7 +39,7 @@ class LockRegistryTest {
         for (int i = 1; i <= 3; i++) {
             LockResult result = engine.tryAcquire(LockRequest.builder()
                     .resourceKey("registry:test:" + i).leaseMs(30_000).build());
-            LockHandle handle = new LockHandle(result, engine, registry);
+            LockHandle handle = new LockHandle(result, engine, registry, metrics);
             registry.register(handle);
         }
 
@@ -57,7 +58,7 @@ class LockRegistryTest {
     void unregisterRemovesFromActiveSet() {
         LockResult result = engine.tryAcquire(LockRequest.builder()
                 .resourceKey("registry:test:unreg").leaseMs(30_000).build());
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
 
         // Close unregisters
@@ -71,7 +72,7 @@ class LockRegistryTest {
     void shutdownIsIdempotent() {
         LockResult result = engine.tryAcquire(LockRequest.builder()
                 .resourceKey("registry:test:idempotent").leaseMs(30_000).build());
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
 
         registry.shutdown();

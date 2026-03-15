@@ -4,6 +4,7 @@ import com.vamva.distributedlock.backend.InMemoryLockBackend;
 import com.vamva.distributedlock.config.DistributedLockProperties;
 import com.vamva.distributedlock.metrics.LockMetrics;
 import com.vamva.distributedlock.model.LockRequest;
+import com.vamva.distributedlock.metrics.LockMetrics;
 import com.vamva.distributedlock.model.LockResult;
 import com.vamva.distributedlock.token.UuidTokenGenerator;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -22,6 +23,7 @@ class LockHandleTest {
 
     private LockEngine engine;
     private LockRegistry registry;
+    private LockMetrics metrics;
 
     @BeforeEach
     void setUp() {
@@ -29,7 +31,7 @@ class LockHandleTest {
         DistributedLockProperties properties = new DistributedLockProperties();
         properties.setBackend("in-memory");
         properties.setDefaultLeaseMs(30_000);
-        LockMetrics metrics = new LockMetrics(new SimpleMeterRegistry(), "in-memory");
+        metrics = new LockMetrics(new SimpleMeterRegistry(), "in-memory");
         engine = new LockEngine(backend, new UuidTokenGenerator(), metrics,
                 Clock.systemUTC(), properties, ObservationRegistry.NOOP);
         registry = new LockRegistry();
@@ -39,7 +41,7 @@ class LockHandleTest {
     void closeReleasesLock() {
         LockResult result = engine.tryAcquire(LockRequest.builder()
                 .resourceKey("handle:test:1").leaseMs(30_000).build());
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
 
         assertTrue(handle.isHeld());
@@ -56,7 +58,7 @@ class LockHandleTest {
     void doubleCloseIsSafe() {
         LockResult result = engine.tryAcquire(LockRequest.builder()
                 .resourceKey("handle:test:2").leaseMs(30_000).build());
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
 
         handle.close();
@@ -68,7 +70,7 @@ class LockHandleTest {
         LockResult result = engine.tryAcquire(LockRequest.builder()
                 .resourceKey("handle:test:3").leaseMs(30_000).build());
 
-        try (LockHandle handle = new LockHandle(result, engine, registry)) {
+        try (LockHandle handle = new LockHandle(result, engine, registry, metrics)) {
             registry.register(handle);
             assertTrue(handle.isHeld());
         }
@@ -85,7 +87,7 @@ class LockHandleTest {
                 .resourceKey("handle:test:4").leaseMs(500).build());
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
         handle.startAutoRenewal(200, 500, scheduler);
 
@@ -109,7 +111,7 @@ class LockHandleTest {
                 .resourceKey("handle:test:5").leaseMs(300).build());
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
         handle.startAutoRenewal(100, 300, scheduler);
 
@@ -127,7 +129,7 @@ class LockHandleTest {
     void exposesLockResultFields() {
         LockResult result = engine.tryAcquire(LockRequest.builder()
                 .resourceKey("handle:test:6").leaseMs(30_000).build());
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
 
         assertEquals("handle:test:6", handle.getResourceKey());
         assertNotNull(handle.getLockToken());
@@ -143,7 +145,7 @@ class LockHandleTest {
                 .resourceKey("handle:test:lost:1").leaseMs(100).build());
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
         // Start renewal at 50ms interval, but lease is only 100ms.
         // After lease expires, another client could acquire, causing renewal to fail.
@@ -169,7 +171,7 @@ class LockHandleTest {
                 .resourceKey("handle:test:lost:2").leaseMs(100).build());
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
 
         AtomicReference<String> lostKey = new AtomicReference<>();
@@ -194,7 +196,7 @@ class LockHandleTest {
                 .resourceKey("handle:test:lost:3").leaseMs(100).build());
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
         handle.startAutoRenewal(50, 100, scheduler);
 
