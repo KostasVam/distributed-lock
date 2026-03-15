@@ -6,6 +6,7 @@ import com.vamva.distributedlock.metrics.LockMetrics;
 import com.vamva.distributedlock.model.LockRequest;
 import com.vamva.distributedlock.model.LockResult;
 import com.vamva.distributedlock.token.TokenGenerator;
+import com.vamva.distributedlock.token.UuidTokenGenerator;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,7 @@ class LockEngineTest {
     @BeforeEach
     void setUp() {
         backend = new InMemoryLockBackend();
-        TokenGenerator tokenGenerator = new TokenGenerator();
+        TokenGenerator tokenGenerator = new UuidTokenGenerator();
         properties = new DistributedLockProperties();
         properties.setBackend("in-memory");
         properties.setDefaultLeaseMs(30_000);

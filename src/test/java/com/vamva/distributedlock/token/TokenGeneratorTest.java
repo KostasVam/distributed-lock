@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TokenGeneratorTest {
 
-    private final TokenGenerator generator = new TokenGenerator();
+    private final TokenGenerator generator = new UuidTokenGenerator();
 
     @Test
     void generatesNonNullToken() {

@@ -7,6 +7,7 @@ import com.vamva.distributedlock.backend.RedisLockBackend;
 import com.vamva.distributedlock.engine.LockEngine;
 import com.vamva.distributedlock.metrics.LockMetrics;
 import com.vamva.distributedlock.token.TokenGenerator;
+import com.vamva.distributedlock.token.UuidTokenGenerator;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -70,7 +71,7 @@ public class DistributedLockAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(TokenGenerator.class)
     public TokenGenerator tokenGenerator() {
-        return new TokenGenerator();
+        return new UuidTokenGenerator();
     }
 
     // ── Metrics ──────────────────────────────────────────────────────────
