@@ -39,6 +39,12 @@ public class DistributedLockAspect {
     public Object around(ProceedingJoinPoint joinPoint, DistributedLock distributedLock) throws Throwable {
         String resourceKey = resolveKey(joinPoint, distributedLock.key());
 
+        if (resourceKey == null || resourceKey.isBlank()) {
+            throw new IllegalArgumentException(
+                    "@DistributedLock key resolved to blank for method: " +
+                    joinPoint.getSignature().toShortString());
+        }
+
         LockRequest request = LockRequest.builder()
                 .resourceKey(resourceKey)
                 .leaseMs(distributedLock.leaseMs())
