@@ -3,6 +3,7 @@ package com.vamva.distributedlock.api;
 import com.vamva.distributedlock.engine.LockEngine;
 import com.vamva.distributedlock.engine.LockHandle;
 import com.vamva.distributedlock.engine.LockRegistry;
+import com.vamva.distributedlock.metrics.LockMetrics;
 import com.vamva.distributedlock.model.LockRequest;
 import com.vamva.distributedlock.model.LockResult;
 import lombok.extern.slf4j.Slf4j;
@@ -26,10 +27,12 @@ public class DistributedLockClient {
 
     private final LockEngine engine;
     private final LockRegistry registry;
+    private final LockMetrics metrics;
 
-    public DistributedLockClient(LockEngine engine, LockRegistry registry) {
+    public DistributedLockClient(LockEngine engine, LockRegistry registry, LockMetrics metrics) {
         this.engine = engine;
         this.registry = registry;
+        this.metrics = metrics;
     }
 
     /**
@@ -106,7 +109,7 @@ public class DistributedLockClient {
         long leaseMs = result.getLeaseMs();
         long renewIntervalMs = leaseMs * 2 / 3;
 
-        LockHandle handle = new LockHandle(result, engine, registry);
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
         registry.register(handle);
         handle.startAutoRenewal(renewIntervalMs, leaseMs, registry.getRenewalScheduler());
 

@@ -1,5 +1,6 @@
 package com.vamva.distributedlock.engine;
 
+import com.vamva.distributedlock.metrics.LockMetrics;
 import com.vamva.distributedlock.model.LockResult;
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,14 +38,16 @@ public class LockHandle implements AutoCloseable {
     private final LockResult lockResult;
     private final LockEngine engine;
     private final LockRegistry registry;
+    private final LockMetrics metrics;
     private final AtomicReference<State> state = new AtomicReference<>(State.HELD);
     private volatile ScheduledFuture<?> renewalTask;
     private volatile Consumer<String> lostCallback;
 
-    public LockHandle(LockResult lockResult, LockEngine engine, LockRegistry registry) {
+    public LockHandle(LockResult lockResult, LockEngine engine, LockRegistry registry, LockMetrics metrics) {
         this.lockResult = lockResult;
         this.engine = engine;
         this.registry = registry;
+        this.metrics = metrics;
     }
 
     /**
@@ -70,6 +73,7 @@ public class LockHandle implements AutoCloseable {
                     if (state.compareAndSet(State.HELD, State.LOST)) {
                         log.warn("Lock LOST: renewal failed for resource_key={} — stopping auto-renewal",
                                 lockResult.getResourceKey());
+                        metrics.recordLockLost();
                         cancelRenewalTask();
                         notifyLockLost();
                     }
@@ -78,6 +82,7 @@ public class LockHandle implements AutoCloseable {
                 if (state.compareAndSet(State.HELD, State.LOST)) {
                     log.error("Lock LOST: renewal error for resource_key={}: {}",
                             lockResult.getResourceKey(), e.getMessage());
+                    metrics.recordLockLost();
                     cancelRenewalTask();
                     notifyLockLost();
                 }

@@ -81,6 +81,22 @@ public class LockMetrics {
         getOrCreateCounter("distributed_lock_fencing_tokens_issued_total", "acquire", null).increment();
     }
 
+    public void recordAcquireContention() {
+        getOrCreateCounter("distributed_lock_acquire_contention_total", "acquire", "contended").increment();
+    }
+
+    public void recordBackendUnavailable() {
+        getOrCreateCounter("distributed_lock_backend_unavailable_total", "acquire", "backend_unavailable").increment();
+    }
+
+    public void recordFailOpenAcquire() {
+        getOrCreateCounter("distributed_lock_fail_open_acquire_total", "acquire", "fail_open").increment();
+    }
+
+    public void recordLockLost() {
+        getOrCreateCounter("distributed_lock_lost_total", "renew", "lost").increment();
+    }
+
     public void recordBackendError() {
         getOrCreateCounter("distributed_lock_backend_errors_total", "backend_error", null).increment();
     }

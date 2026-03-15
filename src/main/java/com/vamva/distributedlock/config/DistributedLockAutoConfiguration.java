@@ -122,8 +122,9 @@ public class DistributedLockAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(DistributedLockClient.class)
-    public DistributedLockClient distributedLockClient(LockEngine engine, LockRegistry registry) {
-        return new DistributedLockClient(engine, registry);
+    public DistributedLockClient distributedLockClient(LockEngine engine, LockRegistry registry,
+                                                       LockMetrics metrics) {
+        return new DistributedLockClient(engine, registry, metrics);
     }
 
     // ── Annotation Support ───────────────────────────────────────────────
