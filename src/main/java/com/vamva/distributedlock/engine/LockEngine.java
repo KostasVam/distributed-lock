@@ -80,10 +80,10 @@ public class LockEngine {
             if (fencingToken >= 0) {
                 long expiresAt = clock.millis() + leaseMs;
                 metrics.recordAcquireSuccess();
-                metrics.recordFencingToken(resourceKey, fencingToken);
+                metrics.recordFencingTokenIssued();
                 observation.lowCardinalityKeyValue("result", "success");
                 log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} fence={} lease_ms={} backend={}",
-                        keyHash, ownerId, token, fencingToken, leaseMs, properties.getBackend());
+                        keyHash, ownerId, truncateToken(token), fencingToken, leaseMs, properties.getBackend());
                 return LockResult.success(resourceKey, token, leaseMs, expiresAt, fencingToken);
             }
 
@@ -112,7 +112,7 @@ public class LockEngine {
      */
     public LockResult acquire(LockRequest request) throws InterruptedException {
         validateRequest(request);
-        if (request.getWaitTimeoutMs() <= 0) {
+        if (request.getWaitTimeoutMs() <= 0 || !properties.getRetry().isEnabled()) {
             return tryAcquire(request);
         }
 
@@ -143,7 +143,7 @@ public class LockEngine {
                 if (fencingToken >= 0) {
                     long expiresAt = clock.millis() + leaseMs;
                     metrics.recordAcquireSuccess();
-                    metrics.recordFencingToken(resourceKey, fencingToken);
+                    metrics.recordFencingTokenIssued();
                     metrics.recordContentionWait(System.nanoTime() - contentionStart);
                     observation.lowCardinalityKeyValue("result", "success")
                             .highCardinalityKeyValue("retry_count", String.valueOf(attempt));
@@ -196,7 +196,7 @@ public class LockEngine {
         Observation observation = startObservation("renew", resourceKey);
 
         log.info("operation=renew_attempt resource_key_hash={} token={} lease_ms={} backend={}",
-                keyHash, token, leaseMs, properties.getBackend());
+                keyHash, truncateToken(token), leaseMs, properties.getBackend());
 
         try {
             boolean renewed = backend.renew(key, token, leaseMs);
@@ -205,12 +205,12 @@ public class LockEngine {
                 metrics.recordRenewSuccess();
                 observation.lowCardinalityKeyValue("result", "success");
                 log.info("operation=renew_success resource_key_hash={} token={} backend={}",
-                        keyHash, token, properties.getBackend());
+                        keyHash, truncateToken(token), properties.getBackend());
             } else {
                 metrics.recordRenewFailed();
                 observation.lowCardinalityKeyValue("result", "failed");
                 log.warn("operation=renew_failed resource_key_hash={} token={} reason=not_owner_or_expired backend={}",
-                        keyHash, token, properties.getBackend());
+                        keyHash, truncateToken(token), properties.getBackend());
             }
 
             return renewed;
@@ -238,7 +238,7 @@ public class LockEngine {
         Observation observation = startObservation("release", resourceKey);
 
         log.info("operation=release_attempt resource_key_hash={} token={} backend={}",
-                keyHash, token, properties.getBackend());
+                keyHash, truncateToken(token), properties.getBackend());
 
         try {
             boolean released = backend.release(key, token);
@@ -247,12 +247,12 @@ public class LockEngine {
                 metrics.recordReleaseSuccess();
                 observation.lowCardinalityKeyValue("result", "success");
                 log.info("operation=release_success resource_key_hash={} token={} backend={}",
-                        keyHash, token, properties.getBackend());
+                        keyHash, truncateToken(token), properties.getBackend());
             } else {
                 metrics.recordReleaseFailed();
                 observation.lowCardinalityKeyValue("result", "failed");
                 log.warn("operation=release_failed resource_key_hash={} token={} reason=not_owner_or_expired backend={}",
-                        keyHash, token, properties.getBackend());
+                        keyHash, truncateToken(token), properties.getBackend());
             }
 
             return released;
@@ -322,6 +322,15 @@ public class LockEngine {
                 .lowCardinalityKeyValue("result", "pending")
                 .highCardinalityKeyValue("resource_group", extractResourceGroup(resourceKey))
                 .start();
+    }
+
+    /**
+     * Truncates a token to first 8 characters for safe logging.
+     * Full tokens are ownership credentials and should not appear in INFO logs.
+     */
+    private String truncateToken(String token) {
+        if (token == null || token.length() <= 8) return token;
+        return token.substring(0, 8) + "...";
     }
 
     private void validateRequest(LockRequest request) {
