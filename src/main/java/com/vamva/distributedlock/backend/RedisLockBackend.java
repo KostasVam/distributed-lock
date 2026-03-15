@@ -10,25 +10,22 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
  * Redis-backed distributed lock using Lua scripts for atomic operations.
  *
  * <p>Wraps all Redis calls in a Resilience4j {@link CircuitBreaker} to prevent
- * cascading failures when Redis is unavailable. The circuit breaker transitions:</p>
- * <ul>
- *   <li><strong>CLOSED</strong> → normal operation, calls go through</li>
- *   <li><strong>OPEN</strong> → after failure threshold, calls short-circuit (fail-closed)</li>
- *   <li><strong>HALF_OPEN</strong> → after wait duration, allows probe calls to test recovery</li>
- * </ul>
+ * cascading failures when Redis is unavailable.</p>
  */
 @Slf4j
 public class RedisLockBackend implements LockBackend {
 
     private final StringRedisTemplate redisTemplate;
-    private final DefaultRedisScript<Long> acquireScript;
+    private final DefaultRedisScript<List> acquireScript;
     private final DefaultRedisScript<Long> releaseScript;
     private final DefaultRedisScript<Long> renewScript;
     private final boolean failOpen;
@@ -42,7 +39,10 @@ public class RedisLockBackend implements LockBackend {
         this.failOpen = failOpen;
         this.metrics = metrics;
 
-        this.acquireScript = loadScript("scripts/acquire.lua");
+        this.acquireScript = new DefaultRedisScript<>();
+        this.acquireScript.setLocation(new ClassPathResource("scripts/acquire.lua"));
+        this.acquireScript.setResultType(List.class);
+
         this.releaseScript = loadScript("scripts/release.lua");
         this.renewScript = loadScript("scripts/renew.lua");
 
@@ -61,12 +61,16 @@ public class RedisLockBackend implements LockBackend {
     }
 
     @Override
-    public boolean acquire(String key, String token, long leaseMs) {
+    public long acquire(String key, String token, long leaseMs) {
         return executeWithCircuitBreaker(() -> {
-            Long result = redisTemplate.execute(acquireScript,
-                    Collections.singletonList(key), token, String.valueOf(leaseMs));
-            return result != null && result == 1L;
-        }, "acquire");
+            String fenceKey = key + ":fence";
+            List result = redisTemplate.execute(acquireScript,
+                    Arrays.asList(key, fenceKey), token, String.valueOf(leaseMs));
+            if (result != null && ((Number) result.get(0)).longValue() == 1L) {
+                return ((Number) result.get(1)).longValue();
+            }
+            return -1L;
+        }, "acquire", -1L);
     }
 
     @Override
@@ -78,7 +82,7 @@ public class RedisLockBackend implements LockBackend {
                 log.debug("Release rejected: token mismatch for key={}", key);
             }
             return result != null && result == 1L;
-        }, "release");
+        }, "release", false);
     }
 
     @Override
@@ -90,29 +94,17 @@ public class RedisLockBackend implements LockBackend {
                 log.debug("Renew rejected: token mismatch for key={}", key);
             }
             return result != null && result == 1L;
-        }, "renew");
+        }, "renew", false);
     }
 
-    /**
-     * Executes a Redis operation through the circuit breaker.
-     * On failure (or when circuit is open), falls back to fail-open/closed behavior.
-     */
-    private boolean executeWithCircuitBreaker(Supplier<Boolean> operation, String operationName) {
+    private <T> T executeWithCircuitBreaker(Supplier<T> operation, String operationName, T failureValue) {
         try {
             return circuitBreaker.executeSupplier(operation);
         } catch (Exception e) {
             log.error("Redis {} failed (circuit={}): {}", operationName, circuitBreaker.getState(), e.getMessage());
             metrics.recordBackendError();
-            return handleFailure(operationName);
+            return failureValue;
         }
-    }
-
-    private boolean handleFailure(String operationName) {
-        if (failOpen && "acquire".equals(operationName)) {
-            log.warn("Fail-open: returning false for lock acquisition due to backend error");
-        }
-        // Locks always fail-closed by default: acquisition fails, release/renew fail
-        return false;
     }
 
     private DefaultRedisScript<Long> loadScript(String path) {

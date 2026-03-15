@@ -5,6 +5,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Clock;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * In-memory lock backend for single-instance, development, and test use.
@@ -14,15 +15,12 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p><strong>Warning:</strong> Locks are not shared across application instances.
  * Use {@link RedisLockBackend} for distributed deployments.</p>
- *
- * <p><strong>Concurrency:</strong> Uses synchronized blocks per lock key to guarantee
- * atomic check-and-set semantics. This backend prioritizes correctness over
- * maximum throughput.</p>
  */
 @Slf4j
 public class InMemoryLockBackend implements LockBackend {
 
     private final ConcurrentHashMap<String, LockEntry> locks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> fenceCounters = new ConcurrentHashMap<>();
     private final Clock clock;
 
     public InMemoryLockBackend() {
@@ -34,19 +32,21 @@ public class InMemoryLockBackend implements LockBackend {
     }
 
     @Override
-    public boolean acquire(String key, String token, long leaseMs) {
+    public long acquire(String key, String token, long leaseMs) {
         long now = clock.millis();
-        boolean[] acquired = {false};
+        long[] fencingToken = {-1L};
 
         locks.compute(key, (k, existing) -> {
             if (existing == null || existing.expiresAt <= now) {
-                acquired[0] = true;
+                fencingToken[0] = fenceCounters
+                        .computeIfAbsent(key, fk -> new AtomicLong(0))
+                        .incrementAndGet();
                 return new LockEntry(token, now + leaseMs);
             }
             return existing;
         });
 
-        return acquired[0];
+        return fencingToken[0];
     }
 
     @Override
@@ -81,9 +81,6 @@ public class InMemoryLockBackend implements LockBackend {
         return renewed[0];
     }
 
-    /**
-     * Removes expired lock entries to prevent memory leaks.
-     */
     @Scheduled(fixedRate = 60_000)
     public void cleanup() {
         long now = clock.millis();

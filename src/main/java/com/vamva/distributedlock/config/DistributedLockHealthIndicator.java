@@ -27,8 +27,8 @@ public class DistributedLockHealthIndicator implements HealthIndicator {
     @Override
     public Health health() {
         try {
-            boolean acquired = backend.acquire(HEALTH_CHECK_KEY, HEALTH_CHECK_TOKEN, HEALTH_CHECK_LEASE_MS);
-            if (acquired) {
+            long fencingToken = backend.acquire(HEALTH_CHECK_KEY, HEALTH_CHECK_TOKEN, HEALTH_CHECK_LEASE_MS);
+            if (fencingToken >= 0) {
                 backend.release(HEALTH_CHECK_KEY, HEALTH_CHECK_TOKEN);
             }
             return Health.up()

@@ -11,7 +11,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Chaos tests verifying behavior when Redis goes down and recovers.
@@ -28,15 +29,15 @@ class ChaosTest {
             LockBackend backend = createRedisBackend(redis.getHost(), redis.getFirstMappedPort());
 
             // Verify working
-            assertTrue(backend.acquire("lock:chaos:1", "token-1", 30_000));
+            assertTrue(backend.acquire("lock:chaos:1", "token-1", 30_000) >= 0);
             backend.release("lock:chaos:1", "token-1");
 
             // Stop Redis
             redis.stop();
 
             // Acquisition should fail (fail-closed)
-            boolean acquired = backend.acquire("lock:chaos:2", "token-2", 30_000);
-            assertFalse(acquired, "Acquisition should fail when Redis is down");
+            long fence = backend.acquire("lock:chaos:2", "token-2", 30_000);
+            assertEquals(-1L, fence, "Acquisition should fail when Redis is down");
         }
     }
 
@@ -52,7 +53,7 @@ class ChaosTest {
             LockBackend backend = createRedisBackend(host, port);
 
             // Verify working
-            assertTrue(backend.acquire("lock:chaos:3", "token-1", 500));
+            assertTrue(backend.acquire("lock:chaos:3", "token-1", 500) >= 0);
 
             // Pause Redis container (keeps port mapping alive, unlike stop)
             redis.getDockerClient().pauseContainerCmd(redis.getContainerId()).exec();
@@ -69,8 +70,8 @@ class ChaosTest {
             Thread.sleep(12_000);
 
             // Should recover
-            boolean acquired = backend.acquire("lock:chaos:4", "token-2", 30_000);
-            assertTrue(acquired, "Should recover after Redis becomes available again");
+            long fence = backend.acquire("lock:chaos:4", "token-2", 30_000);
+            assertTrue(fence >= 0, "Should recover after Redis becomes available again");
             backend.release("lock:chaos:4", "token-2");
         }
     }

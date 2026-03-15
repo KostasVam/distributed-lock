@@ -14,16 +14,26 @@ class InMemoryLockBackendTest {
 
     @Test
     void freeLockCanBeAcquired() {
-        boolean acquired = backend.acquire("lock:test:1", "token-1", 30_000);
-        assertTrue(acquired, "Free lock should be acquired");
+        long fence = backend.acquire("lock:test:1", "token-1", 30_000);
+        assertTrue(fence >= 0, "Free lock should be acquired");
+    }
+
+    @Test
+    void acquireReturnsFencingToken() {
+        long fence1 = backend.acquire("lock:test:fence:1", "token-1", 30_000);
+        assertTrue(fence1 > 0, "First fencing token should be positive");
+
+        backend.release("lock:test:fence:1", "token-1");
+        long fence2 = backend.acquire("lock:test:fence:1", "token-2", 30_000);
+        assertTrue(fence2 > fence1, "Fencing token should be monotonically increasing");
     }
 
     @Test
     void secondClientCannotAcquireHeldLock() {
         backend.acquire("lock:test:2", "token-1", 30_000);
 
-        boolean acquired = backend.acquire("lock:test:2", "token-2", 30_000);
-        assertFalse(acquired, "Second client should not acquire held lock");
+        long fence = backend.acquire("lock:test:2", "token-2", 30_000);
+        assertEquals(-1L, fence, "Second client should not acquire held lock");
     }
 
     @Test
@@ -60,27 +70,21 @@ class InMemoryLockBackendTest {
 
     @Test
     void expiredLockBecomesAvailable() {
-        // Use a mutable clock via Clock.offset to deterministically test expiration
         long baseMs = 1_000_000_000L;
         Clock baseClock = Clock.fixed(Instant.ofEpochMilli(baseMs), ZoneOffset.UTC);
         InMemoryLockBackend timedBackend = new InMemoryLockBackend(baseClock);
 
-        // Acquire with 100ms lease at baseMs
         timedBackend.acquire("lock:test:7", "token-1", 100);
 
-        // Second client cannot acquire (lock not yet expired)
-        boolean blocked = timedBackend.acquire("lock:test:7", "token-2", 30_000);
-        assertFalse(blocked, "Lock should still be held before expiration");
+        long blocked = timedBackend.acquire("lock:test:7", "token-2", 30_000);
+        assertEquals(-1L, blocked, "Lock should still be held before expiration");
 
-        // Create new backend with same data is not possible, so use real sleep approach
-        // with a generous margin to avoid flakiness
         InMemoryLockBackend backend2 = new InMemoryLockBackend();
-        backend2.acquire("lock:test:7b", "token-1", 50); // 50ms lease
+        backend2.acquire("lock:test:7b", "token-1", 50);
+        try { Thread.sleep(100); } catch (InterruptedException ignored) {}
 
-        try { Thread.sleep(100); } catch (InterruptedException ignored) {} // 2x margin
-
-        boolean acquired = backend2.acquire("lock:test:7b", "token-2", 30_000);
-        assertTrue(acquired, "Expired lock should be available for new client");
+        long acquired = backend2.acquire("lock:test:7b", "token-2", 30_000);
+        assertTrue(acquired >= 0, "Expired lock should be available for new client");
     }
 
     @Test
@@ -88,17 +92,17 @@ class InMemoryLockBackendTest {
         backend.acquire("lock:test:8", "token-1", 30_000);
         backend.release("lock:test:8", "token-1");
 
-        boolean acquired = backend.acquire("lock:test:8", "token-2", 30_000);
-        assertTrue(acquired, "Released lock should be available");
+        long fence = backend.acquire("lock:test:8", "token-2", 30_000);
+        assertTrue(fence >= 0, "Released lock should be available");
     }
 
     @Test
     void differentKeysAreIndependent() {
-        boolean a = backend.acquire("lock:test:a", "token-1", 30_000);
-        boolean b = backend.acquire("lock:test:b", "token-2", 30_000);
+        long a = backend.acquire("lock:test:a", "token-1", 30_000);
+        long b = backend.acquire("lock:test:b", "token-2", 30_000);
 
-        assertTrue(a, "Lock A should be acquired");
-        assertTrue(b, "Lock B should be acquired independently");
+        assertTrue(a >= 0, "Lock A should be acquired");
+        assertTrue(b >= 0, "Lock B should be acquired independently");
     }
 
     @Test
@@ -106,13 +110,11 @@ class InMemoryLockBackendTest {
         InMemoryLockBackend backend2 = new InMemoryLockBackend();
         backend2.acquire("lock:test:9", "token-1", 5_000);
 
-        // Renew with longer lease
         boolean renewed = backend2.renew("lock:test:9", "token-1", 30_000);
         assertTrue(renewed, "Should renew before expiry");
 
-        // Lock should still be held (cannot be acquired by another)
-        boolean acquired = backend2.acquire("lock:test:9", "token-2", 30_000);
-        assertFalse(acquired, "Lock should still be held after renewal");
+        long blocked = backend2.acquire("lock:test:9", "token-2", 30_000);
+        assertEquals(-1L, blocked, "Lock should still be held after renewal");
     }
 
     @Test

@@ -26,14 +26,17 @@ package com.vamva.distributedlock.backend;
 public interface LockBackend {
 
     /**
-     * Attempts to acquire a lock atomically.
+     * Attempts to acquire a lock atomically, returning a fencing token on success.
+     *
+     * <p>The fencing token is a monotonically increasing value that downstream systems
+     * can use to reject stale writes from expired lock holders.</p>
      *
      * @param key     the fully-qualified lock key (e.g., {@code lock:job:daily-settlement})
      * @param token   the unique owner token
      * @param leaseMs the lease duration in milliseconds
-     * @return {@code true} if the lock was acquired, {@code false} if already held
+     * @return the fencing token (positive) if acquired, {@code -1} if already held
      */
-    boolean acquire(String key, String token, long leaseMs);
+    long acquire(String key, String token, long leaseMs);
 
     /**
      * Releases a lock atomically, only if the caller owns it.

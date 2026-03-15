@@ -14,7 +14,9 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,36 +49,53 @@ class LuaScriptContractTest {
     @Nested
     class AcquireScript {
 
-        private final DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        private final DefaultRedisScript<List> script = new DefaultRedisScript<>();
 
         {
             script.setLocation(new ClassPathResource("scripts/acquire.lua"));
-            script.setResultType(Long.class);
+            script.setResultType(List.class);
         }
 
         @Test
-        void acquiresFreeLock() {
-            Long result = redisTemplate.execute(script,
-                    Collections.singletonList("lock:contract:1"), "token-1", "30000");
+        void acquiresFreeLockWithFencingToken() {
+            List result = redisTemplate.execute(script,
+                    Arrays.asList("lock:contract:1", "lock:contract:1:fence"), "token-1", "30000");
 
-            assertEquals(1L, result, "Should acquire free lock");
+            assertEquals(1L, ((Number) result.get(0)).longValue(), "Should acquire free lock");
+            assertTrue(((Number) result.get(1)).longValue() > 0, "Fencing token should be positive");
+        }
+
+        @Test
+        void fencingTokenIncrementsMonotonically() {
+            List r1 = redisTemplate.execute(script,
+                    Arrays.asList("lock:contract:mono:1", "lock:contract:mono:1:fence"), "token-1", "1000");
+            long fence1 = ((Number) r1.get(1)).longValue();
+
+            // Let lock expire, then reacquire
+            try { Thread.sleep(1100); } catch (InterruptedException ignored) {}
+
+            List r2 = redisTemplate.execute(script,
+                    Arrays.asList("lock:contract:mono:1", "lock:contract:mono:1:fence"), "token-2", "30000");
+            long fence2 = ((Number) r2.get(1)).longValue();
+
+            assertTrue(fence2 > fence1, "Fencing token should be monotonically increasing");
         }
 
         @Test
         void failsWhenLockAlreadyHeld() {
             redisTemplate.execute(script,
-                    Collections.singletonList("lock:contract:2"), "token-1", "30000");
+                    Arrays.asList("lock:contract:2", "lock:contract:2:fence"), "token-1", "30000");
 
-            Long result = redisTemplate.execute(script,
-                    Collections.singletonList("lock:contract:2"), "token-2", "30000");
+            List result = redisTemplate.execute(script,
+                    Arrays.asList("lock:contract:2", "lock:contract:2:fence"), "token-2", "30000");
 
-            assertEquals(0L, result, "Should fail when lock is held");
+            assertEquals(0L, ((Number) result.get(0)).longValue(), "Should fail when lock is held");
         }
 
         @Test
         void setsTtlOnAcquire() {
             redisTemplate.execute(script,
-                    Collections.singletonList("lock:contract:3"), "token-1", "30000");
+                    Arrays.asList("lock:contract:3", "lock:contract:3:fence"), "token-1", "30000");
 
             Long ttl = redisTemplate.getExpire("lock:contract:3");
             assertNotNull(ttl);
@@ -86,7 +105,7 @@ class LuaScriptContractTest {
         @Test
         void storesOwnerToken() {
             redisTemplate.execute(script,
-                    Collections.singletonList("lock:contract:4"), "my-owner-token", "30000");
+                    Arrays.asList("lock:contract:4", "lock:contract:4:fence"), "my-owner-token", "30000");
 
             String value = redisTemplate.opsForValue().get("lock:contract:4");
             assertEquals("my-owner-token", value);
@@ -94,25 +113,25 @@ class LuaScriptContractTest {
 
         @Test
         void differentKeysAreIndependent() {
-            Long r1 = redisTemplate.execute(script,
-                    Collections.singletonList("lock:contract:a"), "token-1", "30000");
-            Long r2 = redisTemplate.execute(script,
-                    Collections.singletonList("lock:contract:b"), "token-2", "30000");
+            List r1 = redisTemplate.execute(script,
+                    Arrays.asList("lock:contract:a", "lock:contract:a:fence"), "token-1", "30000");
+            List r2 = redisTemplate.execute(script,
+                    Arrays.asList("lock:contract:b", "lock:contract:b:fence"), "token-2", "30000");
 
-            assertEquals(1L, r1);
-            assertEquals(1L, r2);
+            assertEquals(1L, ((Number) r1.get(0)).longValue());
+            assertEquals(1L, ((Number) r2.get(0)).longValue());
         }
     }
 
     @Nested
     class ReleaseScript {
 
-        private final DefaultRedisScript<Long> acquireScript = new DefaultRedisScript<>();
+        private final DefaultRedisScript<List> acquireScript = new DefaultRedisScript<>();
         private final DefaultRedisScript<Long> releaseScript = new DefaultRedisScript<>();
 
         {
             acquireScript.setLocation(new ClassPathResource("scripts/acquire.lua"));
-            acquireScript.setResultType(Long.class);
+            acquireScript.setResultType(List.class);
             releaseScript.setLocation(new ClassPathResource("scripts/release.lua"));
             releaseScript.setResultType(Long.class);
         }
@@ -120,7 +139,7 @@ class LuaScriptContractTest {
         @Test
         void ownerCanRelease() {
             redisTemplate.execute(acquireScript,
-                    Collections.singletonList("lock:release:1"), "token-1", "30000");
+                    Arrays.asList("lock:release:1", "lock:release:1:fence"), "token-1", "30000");
 
             Long result = redisTemplate.execute(releaseScript,
                     Collections.singletonList("lock:release:1"), "token-1");
@@ -132,7 +151,7 @@ class LuaScriptContractTest {
         @Test
         void nonOwnerCannotRelease() {
             redisTemplate.execute(acquireScript,
-                    Collections.singletonList("lock:release:2"), "token-1", "30000");
+                    Arrays.asList("lock:release:2", "lock:release:2:fence"), "token-1", "30000");
 
             Long result = redisTemplate.execute(releaseScript,
                     Collections.singletonList("lock:release:2"), "token-wrong");
@@ -153,12 +172,12 @@ class LuaScriptContractTest {
     @Nested
     class RenewScript {
 
-        private final DefaultRedisScript<Long> acquireScript = new DefaultRedisScript<>();
+        private final DefaultRedisScript<List> acquireScript = new DefaultRedisScript<>();
         private final DefaultRedisScript<Long> renewScript = new DefaultRedisScript<>();
 
         {
             acquireScript.setLocation(new ClassPathResource("scripts/acquire.lua"));
-            acquireScript.setResultType(Long.class);
+            acquireScript.setResultType(List.class);
             renewScript.setLocation(new ClassPathResource("scripts/renew.lua"));
             renewScript.setResultType(Long.class);
         }
@@ -166,7 +185,7 @@ class LuaScriptContractTest {
         @Test
         void ownerCanRenew() {
             redisTemplate.execute(acquireScript,
-                    Collections.singletonList("lock:renew:1"), "token-1", "5000");
+                    Arrays.asList("lock:renew:1", "lock:renew:1:fence"), "token-1", "5000");
 
             Long result = redisTemplate.execute(renewScript,
                     Collections.singletonList("lock:renew:1"), "token-1", "60000");
@@ -180,7 +199,7 @@ class LuaScriptContractTest {
         @Test
         void nonOwnerCannotRenew() {
             redisTemplate.execute(acquireScript,
-                    Collections.singletonList("lock:renew:2"), "token-1", "30000");
+                    Arrays.asList("lock:renew:2", "lock:renew:2:fence"), "token-1", "30000");
 
             Long result = redisTemplate.execute(renewScript,
                     Collections.singletonList("lock:renew:2"), "token-wrong", "60000");

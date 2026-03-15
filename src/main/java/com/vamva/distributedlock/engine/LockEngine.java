@@ -73,17 +73,17 @@ public class LockEngine {
                 keyHash, ownerId, leaseMs, properties.getBackend());
 
         try {
-            boolean acquired = backend.acquire(key, token, leaseMs);
+            long fencingToken = backend.acquire(key, token, leaseMs);
             long durationNanos = System.nanoTime() - start;
             metrics.recordAcquireDuration(durationNanos);
 
-            if (acquired) {
+            if (fencingToken >= 0) {
                 long expiresAt = clock.millis() + leaseMs;
                 metrics.recordAcquireSuccess();
                 observation.lowCardinalityKeyValue("result", "success");
-                log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} lease_ms={} backend={}",
-                        keyHash, ownerId, token, leaseMs, properties.getBackend());
-                return LockResult.success(resourceKey, token, leaseMs, expiresAt);
+                log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} fence={} lease_ms={} backend={}",
+                        keyHash, ownerId, token, fencingToken, leaseMs, properties.getBackend());
+                return LockResult.success(resourceKey, token, leaseMs, expiresAt, fencingToken);
             }
 
             metrics.recordAcquireFailed();
@@ -136,18 +136,18 @@ public class LockEngine {
                 metrics.recordAcquireAttempt();
                 long start = System.nanoTime();
 
-                boolean acquired = backend.acquire(key, token, leaseMs);
+                long fencingToken = backend.acquire(key, token, leaseMs);
                 metrics.recordAcquireDuration(System.nanoTime() - start);
 
-                if (acquired) {
+                if (fencingToken >= 0) {
                     long expiresAt = clock.millis() + leaseMs;
                     metrics.recordAcquireSuccess();
                     metrics.recordContentionWait(System.nanoTime() - contentionStart);
                     observation.lowCardinalityKeyValue("result", "success")
                             .highCardinalityKeyValue("retry_count", String.valueOf(attempt));
-                    log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} lease_ms={} attempts={} backend={}",
-                            keyHash, ownerId, token, leaseMs, attempt + 1, properties.getBackend());
-                    return LockResult.success(resourceKey, token, leaseMs, expiresAt);
+                    log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} fence={} lease_ms={} attempts={} backend={}",
+                            keyHash, ownerId, token, fencingToken, leaseMs, attempt + 1, properties.getBackend());
+                    return LockResult.success(resourceKey, token, leaseMs, expiresAt, fencingToken);
                 }
 
                 attempt++;
