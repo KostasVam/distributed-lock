@@ -37,4 +37,11 @@ public @interface DistributedLock {
 
     /** Maximum time in milliseconds to wait for lock acquisition. 0 means single attempt. */
     long waitTimeoutMs() default 0;
+
+    /**
+     * Whether to enable auto-renewal for the lock during method execution.
+     * When true, a background thread renews the lease at 2/3 of the lease interval.
+     * Recommended for methods that may run longer than the lease duration.
+     */
+    boolean autoRenew() default false;
 }

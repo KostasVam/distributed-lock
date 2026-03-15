@@ -2,6 +2,7 @@ package com.vamva.distributedlock.annotation;
 
 import com.vamva.distributedlock.api.DistributedLockClient;
 import com.vamva.distributedlock.api.LockAcquisitionException;
+import com.vamva.distributedlock.engine.LockHandle;
 import com.vamva.distributedlock.model.LockRequest;
 import com.vamva.distributedlock.model.LockResult;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +22,8 @@ import java.lang.reflect.Method;
  * AOP aspect that intercepts methods annotated with {@link DistributedLock}.
  *
  * <p>Acquires the lock before method execution and releases it in a finally block.
- * Supports SpEL expressions in the key attribute for dynamic resource key resolution.</p>
+ * When {@code autoRenew=true}, uses {@link LockHandle} with background renewal
+ * to prevent lease expiration during long-running methods.</p>
  */
 @Aspect
 @Slf4j
@@ -51,6 +53,15 @@ public class DistributedLockAspect {
                 .waitTimeoutMs(distributedLock.waitTimeoutMs())
                 .build();
 
+        if (distributedLock.autoRenew()) {
+            return executeWithAutoRenew(joinPoint, request, resourceKey);
+        }
+
+        return executeWithPlainLock(joinPoint, request, resourceKey);
+    }
+
+    private Object executeWithPlainLock(ProceedingJoinPoint joinPoint, LockRequest request,
+                                        String resourceKey) throws Throwable {
         LockResult lockResult = lockClient.acquire(request);
 
         if (!lockResult.isAcquired()) {
@@ -65,6 +76,13 @@ public class DistributedLockAspect {
             if (!released) {
                 log.warn("Failed to release @DistributedLock resource_key={} (may have expired)", resourceKey);
             }
+        }
+    }
+
+    private Object executeWithAutoRenew(ProceedingJoinPoint joinPoint, LockRequest request,
+                                        String resourceKey) throws Throwable {
+        try (LockHandle handle = lockClient.acquireWithAutoRenew(request)) {
+            return joinPoint.proceed();
         }
     }
 
