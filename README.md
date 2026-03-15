@@ -1,5 +1,6 @@
 # Distributed Lock
 
+[![CI](https://github.com/KostasVam/distributed-lock/actions/workflows/ci.yml/badge.svg)](https://github.com/KostasVam/distributed-lock/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A lease-based distributed lock library with Redis-backed coordination, safe ownership semantics, and built-in observability for Spring Boot.
@@ -40,9 +41,15 @@ A Spring Boot library that provides distributed mutual exclusion using Redis as 
 - [x] Prometheus metrics via Micrometer (low-cardinality labels)
 - [x] Micrometer Observation tracing spans
 - [x] Structured logging with hashed resource keys
-- [x] Resilience4j circuit breaker around Redis calls
+- [x] Resilience4j circuit breaker around Redis calls (configurable thresholds)
 - [x] Spring Boot Starter packaging (auto-configuration, no component scanning)
 - [x] Global `ownerId` and `defaultLeaseMs` configuration
+- [x] Input validation on all API operations
+- [x] Health indicator for backend status (`/actuator/health`)
+- [x] `TokenGenerator` interface for pluggable token strategies
+- [x] Lua scripts distinguish key-not-found vs token-mismatch
+- [x] Bean Validation on configuration properties (`@Min`, `@Valid`)
+- [x] Chaos tests (Redis stop/pause/recovery with circuit breaker)
 
 ## Architecture
 
@@ -339,7 +346,8 @@ distributed-lock/
 │   │   │   └── InMemoryLockBackend.java
 │   │   ├── config/
 │   │   │   ├── DistributedLockAutoConfiguration.java
-│   │   │   └── DistributedLockProperties.java
+│   │   │   ├── DistributedLockProperties.java
+│   │   │   └── DistributedLockHealthIndicator.java
 │   │   ├── engine/
 │   │   │   └── LockEngine.java
 │   │   ├── metrics/
@@ -348,7 +356,8 @@ distributed-lock/
 │   │   │   ├── LockRequest.java
 │   │   │   └── LockResult.java
 │   │   └── token/
-│   │       └── TokenGenerator.java
+│   │       ├── TokenGenerator.java          # interface
+│   │       └── UuidTokenGenerator.java
 │   ├── main/resources/
 │   │   ├── application.yml
 │   │   ├── META-INF/spring/
@@ -366,7 +375,8 @@ distributed-lock/
 │       │   └── TokenGeneratorTest.java
 │       └── integration/
 │           ├── DistributedLockIntegrationTest.java
-│           └── LuaScriptContractTest.java
+│           ├── LuaScriptContractTest.java
+│           └── ChaosTest.java
 ├── docs/
 │   ├── architecture.md
 │   ├── safety.md
@@ -380,10 +390,12 @@ distributed-lock/
 │       ├── ADR-004-lua-scripts-for-atomicity.md
 │       ├── ADR-005-fail-closed-default.md
 │       └── ADR-006-non-reentrant-semantics.md
+├── .github/workflows/ci.yml
 ├── docker-compose.yml
 ├── build.gradle.kts
 ├── settings.gradle.kts
 ├── CHANGELOG.md
+├── LICENSE
 └── README.md
 ```
 
@@ -432,12 +444,20 @@ distributed-lock/
 ## Roadmap
 
 ### v0.1.0 (Current)
-- Redis + in-memory backends with Resilience4j circuit breaker
+- Redis + in-memory backends with Resilience4j circuit breaker (configurable)
 - tryAcquire, acquire with timeout, renew, release, executeWithLock
 - Configurable retry policy (exponential backoff + jitter)
-- Prometheus metrics + Micrometer tracing spans
+- Prometheus metrics + Micrometer Observation tracing spans
 - Spring Boot Starter packaging with auto-configuration
-- Comprehensive test suite (unit, Lua contract, integration with Testcontainers)
+- Health indicator for backend status
+- Input validation on all API operations and configuration
+- TokenGenerator interface for pluggable token strategies
+- Lua scripts with key-not-found vs token-mismatch distinction
+- GitHub Actions CI pipeline with Redis service container
+- 6 Architecture Decision Records
+- Documentation: architecture, safety/threat model, performance, Redis deployment, Grafana
+- Comprehensive test suite: unit, Lua contract, integration, chaos (Testcontainers)
+- MIT License
 
 ### Future Considerations
 - Fencing tokens for stronger downstream safety
@@ -445,5 +465,6 @@ distributed-lock/
 - Leader election mode
 - Admin inspection API / lock debugging endpoint
 - Lock contention dashboard
-- Annotation / AOP integration
+- Annotation / AOP integration (`@DistributedLock`)
 - SQL backend
+- Graceful shutdown hooks (automatic lock release on app shutdown)
