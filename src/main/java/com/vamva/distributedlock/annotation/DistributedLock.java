@@ -43,5 +43,11 @@ public @interface DistributedLock {
      * When true, a background thread renews the lease at 2/3 of the lease interval.
      * Recommended for methods that may run longer than the lease duration.
      */
-    boolean autoRenew() default false;
+    /**
+     * Whether to enable auto-renewal for the lock during method execution.
+     * Defaults to {@code true} to prevent lease expiration during execution.
+     * Set to {@code false} only for very short critical sections where lease
+     * duration is guaranteed to exceed method execution time.
+     */
+    boolean autoRenew() default true;
 }
