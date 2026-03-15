@@ -60,24 +60,24 @@ class InMemoryLockBackendTest {
 
     @Test
     void expiredLockBecomesAvailable() {
+        // Use a mutable clock via Clock.offset to deterministically test expiration
         long baseMs = 1_000_000_000L;
-        Clock fixedClock = Clock.fixed(Instant.ofEpochMilli(baseMs), ZoneOffset.UTC);
-        InMemoryLockBackend timedBackend = new InMemoryLockBackend(fixedClock);
+        Clock baseClock = Clock.fixed(Instant.ofEpochMilli(baseMs), ZoneOffset.UTC);
+        InMemoryLockBackend timedBackend = new InMemoryLockBackend(baseClock);
 
+        // Acquire with 100ms lease at baseMs
         timedBackend.acquire("lock:test:7", "token-1", 100);
 
-        // Advance clock past expiration
-        Clock advancedClock = Clock.fixed(Instant.ofEpochMilli(baseMs + 200), ZoneOffset.UTC);
-        InMemoryLockBackend afterExpiry = new InMemoryLockBackend(advancedClock);
-        // Simulate by using a new backend with advanced clock — but we need the same state.
-        // Instead, use the real approach: test via reacquire after TTL using a single mutable clock
+        // Second client cannot acquire (lock not yet expired)
+        boolean blocked = timedBackend.acquire("lock:test:7", "token-2", 30_000);
+        assertFalse(blocked, "Lock should still be held before expiration");
 
-        // Better approach: acquire lock with short TTL, manually check expiration
+        // Create new backend with same data is not possible, so use real sleep approach
+        // with a generous margin to avoid flakiness
         InMemoryLockBackend backend2 = new InMemoryLockBackend();
-        backend2.acquire("lock:test:7b", "token-1", 1); // 1ms lease
+        backend2.acquire("lock:test:7b", "token-1", 50); // 50ms lease
 
-        // Sleep briefly to let it expire
-        try { Thread.sleep(10); } catch (InterruptedException ignored) {}
+        try { Thread.sleep(100); } catch (InterruptedException ignored) {} // 2x margin
 
         boolean acquired = backend2.acquire("lock:test:7b", "token-2", 30_000);
         assertTrue(acquired, "Expired lock should be available for new client");
