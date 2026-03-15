@@ -220,8 +220,23 @@ distributed-lock:
 | `distributed_lock_acquire_duration_ms` | Timer | `backend` |
 | `distributed_lock_contention_wait_ms` | Timer | `backend` |
 | `distributed_lock_fencing_tokens_issued_total` | Counter | `operation`, `backend` |
+| `distributed_lock_acquire_contention_total` | Counter | `operation`, `result`, `backend` |
+| `distributed_lock_backend_unavailable_total` | Counter | `operation`, `result`, `backend` |
+| `distributed_lock_fail_open_acquire_total` | Counter | `operation`, `result`, `backend` |
+| `distributed_lock_lost_total` | Counter | `operation`, `result`, `backend` |
 
 Metrics endpoint: `GET /actuator/prometheus`
+
+### Event → Metric / Log / Outcome Mapping
+
+| Event | AcquireOutcome | Metric | Log Level |
+|---|---|---|---|
+| Lock acquired normally | `ACQUIRED` | `acquire_success_total` | INFO |
+| Lock held by another client | `CONTENDED` | `acquire_contention_total` | INFO |
+| Retry timeout exhausted | `TIMEOUT` | `acquire_failed_total` | INFO |
+| Redis/circuit breaker down | `BACKEND_UNAVAILABLE` | `backend_unavailable_total` | ERROR |
+| Redis down + fail-open | `FAIL_OPEN_SYNTHETIC` | `fail_open_acquire_total` | WARN |
+| Auto-renewal failed | State → `LOST` | `lost_total` | WARN |
 
 ### Structured Logs
 
