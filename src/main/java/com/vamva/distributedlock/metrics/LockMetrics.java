@@ -1,6 +1,7 @@
 package com.vamva.distributedlock.metrics;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 
@@ -33,6 +34,7 @@ public class LockMetrics {
     private final String backendType;
     private final ConcurrentHashMap<String, Counter> counterCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Timer> timerCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicLong> fencingGauges = new ConcurrentHashMap<>();
 
     public LockMetrics(MeterRegistry registry, String backendType) {
         this.registry = registry;
@@ -75,6 +77,18 @@ public class LockMetrics {
     public void recordContentionWait(long nanos) {
         getOrCreateTimer("distributed_lock_contention_wait_ms",
                 "Time spent waiting for lock acquisition under contention").record(Duration.ofNanos(nanos));
+    }
+
+    public void recordFencingToken(String resourceKey, long fencingToken) {
+        java.util.concurrent.atomic.AtomicLong gauge = fencingGauges.computeIfAbsent(resourceKey, k -> {
+            java.util.concurrent.atomic.AtomicLong value = new java.util.concurrent.atomic.AtomicLong(0);
+            Gauge.builder("distributed_lock_fencing_token_latest", value, java.util.concurrent.atomic.AtomicLong::doubleValue)
+                    .description("Latest fencing token value per resource key")
+                    .tag("backend", backendType)
+                    .register(registry);
+            return value;
+        });
+        gauge.set(fencingToken);
     }
 
     public void recordBackendError() {

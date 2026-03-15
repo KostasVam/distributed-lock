@@ -80,6 +80,7 @@ public class LockEngine {
             if (fencingToken >= 0) {
                 long expiresAt = clock.millis() + leaseMs;
                 metrics.recordAcquireSuccess();
+                metrics.recordFencingToken(resourceKey, fencingToken);
                 observation.lowCardinalityKeyValue("result", "success");
                 log.info("operation=acquire_success resource_key_hash={} owner_id={} token={} fence={} lease_ms={} backend={}",
                         keyHash, ownerId, token, fencingToken, leaseMs, properties.getBackend());
@@ -142,6 +143,7 @@ public class LockEngine {
                 if (fencingToken >= 0) {
                     long expiresAt = clock.millis() + leaseMs;
                     metrics.recordAcquireSuccess();
+                    metrics.recordFencingToken(resourceKey, fencingToken);
                     metrics.recordContentionWait(System.nanoTime() - contentionStart);
                     observation.lowCardinalityKeyValue("result", "success")
                             .highCardinalityKeyValue("retry_count", String.valueOf(attempt));
