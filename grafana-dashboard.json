@@ -129,11 +129,34 @@
     {
       "title": "Fencing Tokens Issued",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 12 },
       "targets": [
         {
           "expr": "increase(distributed_lock_fencing_tokens_issued_total[5m])",
           "legendFormat": "issued"
+        }
+      ]
+    },
+    {
+      "title": "Degraded Modes",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(distributed_lock_acquire_contention_total[5m])",
+          "legendFormat": "contention"
+        },
+        {
+          "expr": "rate(distributed_lock_backend_unavailable_total[5m])",
+          "legendFormat": "backend unavailable"
+        },
+        {
+          "expr": "rate(distributed_lock_fail_open_acquire_total[5m])",
+          "legendFormat": "fail-open synthetic"
+        },
+        {
+          "expr": "rate(distributed_lock_lost_total[5m])",
+          "legendFormat": "lock lost"
         }
       ]
     }

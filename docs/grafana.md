@@ -12,6 +12,7 @@
 | **Backend Errors** | Stat | Redis error count over 5 minutes |
 | **Acquire Success Ratio** | Gauge | Success / (Success + Failed) over 5 minutes |
 | **Fencing Tokens Issued** | Stat | Total fencing tokens issued (contention rate indicator) |
+| **Degraded Modes** | Time series | Contention, backend unavailable, fail-open synthetic, lock lost rates |
 
 ### Import
 

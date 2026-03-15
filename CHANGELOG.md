@@ -36,8 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lightweight Spring Boot Starter (no web dependency, no global @EnableScheduling)
 - `@DistributedLock` annotation with SpEL keys and `autoRenew` attribute
 - `LockHandle` state model: HELD → LOST → RELEASED with `onLockLost()` callback
-- Fail-open mode returns synthetic success (fencingToken=0) when backend is unavailable
+- `AcquireOutcome` enum: ACQUIRED, CONTENDED, TIMEOUT, BACKEND_UNAVAILABLE, FAIL_OPEN_SYNTHETIC
+- `LockResult.isVerifiedOwnership()` distinguishes real vs synthetic acquisition
+- Fail-open mode returns `FAIL_OPEN_SYNTHETIC` outcome (fencingToken=0) when backend unavailable
 - `retry.enabled` config is authoritative (false disables retries even with waitTimeoutMs)
+- `@DistributedLock.autoRenew` defaults to `true` for safer method-level locking
+- Degraded mode metrics: `contention_total`, `backend_unavailable_total`, `fail_open_acquire_total`, `lost_total`
 - GitHub Actions CI pipeline with Redis service container
 - Usage examples: batch-job, scheduler-singleton, leader-election
 - Comprehensive test suite: unit, Lua contract, integration, annotation, auto-renew, fencing, chaos
