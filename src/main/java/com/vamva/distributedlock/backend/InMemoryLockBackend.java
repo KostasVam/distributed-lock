@@ -36,13 +36,17 @@ public class InMemoryLockBackend implements LockBackend {
     @Override
     public boolean acquire(String key, String token, long leaseMs) {
         long now = clock.millis();
+        boolean[] acquired = {false};
 
-        return locks.compute(key, (k, existing) -> {
+        locks.compute(key, (k, existing) -> {
             if (existing == null || existing.expiresAt <= now) {
+                acquired[0] = true;
                 return new LockEntry(token, now + leaseMs);
             }
             return existing;
-        }).token.equals(token);
+        });
+
+        return acquired[0];
     }
 
     @Override
