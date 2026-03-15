@@ -36,7 +36,7 @@ public class DistributedLockClient {
      * Attempts to acquire a lock once. Returns immediately.
      *
      * @param request the lock request
-     * @return the lock result (check {@link LockResult#isAcquired()})
+     * @return the lock result (check {@code isAcquired()})
      */
     public LockResult tryAcquire(LockRequest request) {
         return engine.tryAcquire(request);

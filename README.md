@@ -50,6 +50,11 @@ A Spring Boot library that provides distributed mutual exclusion using Redis as 
 - [x] Lua scripts distinguish key-not-found vs token-mismatch
 - [x] Bean Validation on configuration properties (`@Min`, `@Valid`)
 - [x] Chaos tests (Redis stop/pause/recovery with circuit breaker)
+- [x] Fencing tokens (monotonically increasing via Redis INCR)
+- [x] Auto-renew helper (`LockHandle` with background renewal)
+- [x] Graceful shutdown (automatic lock release via `LockRegistry` @PreDestroy)
+- [x] `@DistributedLock` annotation with SpEL key expressions (AOP)
+- [x] Usage examples (batch-job, scheduler-singleton, leader-election)
 
 ## Architecture
 
@@ -440,6 +445,8 @@ distributed-lock/
 | [ADR-004](docs/adr/ADR-004-lua-scripts-for-atomicity.md) | Use Lua scripts for atomic release/renew |
 | [ADR-005](docs/adr/ADR-005-fail-closed-default.md) | Default to fail-closed on backend failure |
 | [ADR-006](docs/adr/ADR-006-non-reentrant-semantics.md) | Non-reentrant lock semantics |
+| [ADR-007](docs/adr/ADR-007-fencing-tokens.md) | Fencing tokens for stale owner protection |
+| [ADR-008](docs/adr/ADR-008-annotation-aop.md) | @DistributedLock annotation with AOP |
 
 ## Roadmap
 
@@ -454,17 +461,18 @@ distributed-lock/
 - TokenGenerator interface for pluggable token strategies
 - Lua scripts with key-not-found vs token-mismatch distinction
 - GitHub Actions CI pipeline with Redis service container
-- 6 Architecture Decision Records
+- Fencing tokens (monotonically increasing via Redis INCR)
+- Auto-renew helper (LockHandle with background lease renewal)
+- Graceful shutdown (LockRegistry @PreDestroy releases all locks)
+- `@DistributedLock` annotation with SpEL and AOP
+- Usage examples: batch-job, scheduler-singleton, leader-election
+- 8 Architecture Decision Records
 - Documentation: architecture, safety/threat model, performance, Redis deployment, Grafana
 - Comprehensive test suite: unit, Lua contract, integration, chaos (Testcontainers)
 - MIT License
 
 ### Future Considerations
-- Fencing tokens for stronger downstream safety
-- Auto-renew helper for long-running tasks
-- Leader election mode
 - Admin inspection API / lock debugging endpoint
 - Lock contention dashboard
-- Annotation / AOP integration (`@DistributedLock`)
 - SQL backend
-- Graceful shutdown hooks (automatic lock release on app shutdown)
+- Reentrant locks

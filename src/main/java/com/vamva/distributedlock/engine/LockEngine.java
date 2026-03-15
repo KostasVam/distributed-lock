@@ -22,7 +22,7 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * <p>Handles retry logic with configurable exponential backoff and jitter for
  * acquire-with-timeout semantics. Single-attempt try-lock is also supported
- * when {@link LockRequest#getWaitTimeoutMs()} is zero.</p>
+ * when {@code waitTimeoutMs} is zero.</p>
  *
  * <p>Uses an injected {@link Clock} for all time operations, enabling
  * deterministic testing.</p>
