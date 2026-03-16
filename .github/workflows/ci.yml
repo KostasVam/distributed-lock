@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: write
+
 jobs:
   test:
     name: Build & Test
@@ -40,8 +43,30 @@ jobs:
       - name: Build
         run: ./gradlew build
 
-      - name: Run tests
-        run: ./gradlew test
+      - name: Run tests with coverage
+        run: ./gradlew test jacocoTestReport
         env:
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
+
+      - name: Generate JaCoCo badge
+        id: jacoco
+        uses: cicirello/jacoco-badge-generator@v2
+        with:
+          jacoco-csv-file: build/reports/jacoco/test/jacocoTestReport.csv
+          badges-directory: .github/badges
+          generate-coverage-badge: true
+          coverage-badge-filename: coverage.svg
+
+      - name: Log coverage
+        run: echo "Coverage = ${{ steps.jacoco.outputs.coverage }}"
+
+      - name: Push badge to repo
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p .github/badges
+          git add .github/badges/coverage.svg
+          git diff --cached --quiet || git commit -m "ci: update coverage badge [skip ci]"
+          git push

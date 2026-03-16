@@ -1,6 +1,7 @@
 # Distributed Lock
 
 [![CI](https://github.com/KostasVam/distributed-lock/actions/workflows/ci.yml/badge.svg)](https://github.com/KostasVam/distributed-lock/actions/workflows/ci.yml)
+[![Coverage](.github/badges/coverage.svg)](build/reports/jacoco/test/html/index.html)
 [![Java 17](https://img.shields.io/badge/Java-17-blue.svg)](https://openjdk.org/projects/jdk/17/)
 [![Spring Boot 3.4](https://img.shields.io/badge/Spring%20Boot-3.4-green.svg)](https://spring.io/projects/spring-boot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
