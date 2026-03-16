@@ -41,7 +41,17 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("chaos")
+    }
+}
+
+tasks.register<Test>("chaosTest") {
+    useJUnitPlatform {
+        includeTags("chaos")
+    }
+    description = "Run chaos tests (requires Docker-in-Docker for container pause/stop)"
+    group = "verification"
 }
 
 tasks.javadoc {

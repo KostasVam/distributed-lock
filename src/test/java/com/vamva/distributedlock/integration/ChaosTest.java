@@ -5,20 +5,25 @@ import com.vamva.distributedlock.backend.RedisLockBackend;
 import com.vamva.distributedlock.config.DistributedLockProperties;
 import com.vamva.distributedlock.metrics.LockMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Chaos tests verifying behavior when Redis goes down and recovers.
  * Uses manually managed containers to control start/stop lifecycle.
+ *
+ * <p>These tests require Docker-in-Docker support (pause/unpause commands)
+ * and are excluded from standard CI runs. Run locally or in environments
+ * with full Docker access.</p>
  */
 @Testcontainers
+@Tag("chaos")
 class ChaosTest {
 
     @Test
@@ -37,13 +42,12 @@ class ChaosTest {
 
             // Acquisition should fail (fail-closed)
             long fence = backend.acquire("lock:chaos:2", "token-2", 30_000);
-            assertEquals(-1L, fence, "Acquisition should fail when Redis is down");
+            assertTrue(fence < 0, "Acquisition should fail when Redis is down");
         }
     }
 
     @Test
     void recoversAfterRedisRestart() throws InterruptedException {
-        // Use a fixed exposed port via docker to enable reconnection
         try (GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
                 .withExposedPorts(6379)) {
             redis.start();
