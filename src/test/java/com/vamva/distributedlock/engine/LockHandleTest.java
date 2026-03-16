@@ -211,4 +211,40 @@ class LockHandleTest {
         assertEquals(LockHandle.State.RELEASED, handle.getState());
         scheduler.shutdownNow();
     }
+
+    @Test
+    void callbackExceptionDoesNotBreakStateTransition() throws InterruptedException {
+        LockResult result = engine.tryAcquire(LockRequest.builder()
+                .resourceKey("handle:test:lost:4").leaseMs(100).build());
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
+        registry.register(handle);
+
+        handle.onLockLost(key -> { throw new RuntimeException("callback exploded"); });
+        handle.startAutoRenewal(50, 100, scheduler);
+
+        engine.release(result.getResourceKey(), result.getLockToken());
+        Thread.sleep(300);
+
+        // State should still transition despite callback exception
+        assertEquals(LockHandle.State.LOST, handle.getState());
+
+        handle.close();
+        scheduler.shutdownNow();
+    }
+
+    @Test
+    void handleWithoutAutoRenewalCloseReleasesNormally() {
+        LockResult result = engine.tryAcquire(LockRequest.builder()
+                .resourceKey("handle:test:no-renew").leaseMs(30_000).build());
+
+        LockHandle handle = new LockHandle(result, engine, registry, metrics);
+        registry.register(handle);
+
+        // No startAutoRenewal called
+        assertTrue(handle.isHeld());
+        handle.close();
+        assertEquals(LockHandle.State.RELEASED, handle.getState());
+    }
 }
