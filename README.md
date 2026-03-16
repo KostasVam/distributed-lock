@@ -519,6 +519,7 @@ If you need stronger guarantees, use a consensus system (ZooKeeper, etcd) instea
 | Document | Description |
 |---|---|
 | [Architecture](docs/architecture.md) | Component overview, sequence diagrams, deployment topology |
+| [Guarantees](docs/guarantees.md) | What the library guarantees, what it does not, scenario matrix, consumer responsibilities |
 | [Safety](docs/safety.md) | Consistency model, failure modes, misuse scenarios |
 | [Performance](docs/performance.md) | Latency model, throughput, memory characteristics |
 | [Redis Deployment](docs/redis-deployment.md) | Standalone, Sentinel, Cluster config, connection pooling |
