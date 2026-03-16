@@ -365,8 +365,11 @@ distributed-lock/
 │   │   ├── api/
 │   │   │   ├── DistributedLockClient.java
 │   │   │   └── LockAcquisitionException.java
+│   │   ├── annotation/
+│   │   │   ├── DistributedLock.java         # @DistributedLock annotation
+│   │   │   └── DistributedLockAspect.java   # AOP aspect with SpEL + autoRenew
 │   │   ├── backend/
-│   │   │   ├── LockBackend.java
+│   │   │   ├── LockBackend.java             # interface
 │   │   │   ├── RedisLockBackend.java
 │   │   │   └── InMemoryLockBackend.java
 │   │   ├── config/
@@ -374,15 +377,22 @@ distributed-lock/
 │   │   │   ├── DistributedLockProperties.java
 │   │   │   └── DistributedLockHealthIndicator.java
 │   │   ├── engine/
-│   │   │   └── LockEngine.java
+│   │   │   ├── LockEngine.java
+│   │   │   ├── LockHandle.java              # AutoCloseable handle with HELD/LOST/RELEASED state
+│   │   │   └── LockRegistry.java            # graceful shutdown, renewal scheduler
 │   │   ├── metrics/
 │   │   │   └── LockMetrics.java
 │   │   ├── model/
+│   │   │   ├── AcquireOutcome.java          # ACQUIRED/CONTENDED/TIMEOUT/BACKEND_UNAVAILABLE/FAIL_OPEN
 │   │   │   ├── LockRequest.java
 │   │   │   └── LockResult.java
-│   │   └── token/
-│   │       ├── TokenGenerator.java          # interface
-│   │       └── UuidTokenGenerator.java
+│   │   ├── token/
+│   │   │   ├── TokenGenerator.java          # interface
+│   │   │   └── UuidTokenGenerator.java
+│   │   └── demo/
+│   │       ├── BatchJobExample.java
+│   │       ├── SchedulerSingletonExample.java
+│   │       └── LeaderElectionExample.java
 │   ├── main/resources/
 │   │   ├── application.yml
 │   │   ├── META-INF/spring/
@@ -395,15 +405,21 @@ distributed-lock/
 │       ├── backend/
 │       │   └── InMemoryLockBackendTest.java
 │       ├── engine/
-│       │   └── LockEngineTest.java
+│       │   ├── LockEngineTest.java
+│       │   ├── LockHandleTest.java
+│       │   └── LockRegistryTest.java
 │       ├── token/
 │       │   └── TokenGeneratorTest.java
 │       └── integration/
 │           ├── DistributedLockIntegrationTest.java
 │           ├── LuaScriptContractTest.java
-│           └── ChaosTest.java
+│           ├── FencingTokenIntegrationTest.java
+│           ├── AutoRenewIntegrationTest.java
+│           ├── AnnotationIntegrationTest.java
+│           └── ChaosTest.java               # @Tag("chaos"), excluded from CI
 ├── docs/
 │   ├── architecture.md
+│   ├── guarantees.md
 │   ├── safety.md
 │   ├── performance.md
 │   ├── redis-deployment.md
@@ -414,8 +430,13 @@ distributed-lock/
 │       ├── ADR-003-owner-token-required.md
 │       ├── ADR-004-lua-scripts-for-atomicity.md
 │       ├── ADR-005-fail-closed-default.md
-│       └── ADR-006-non-reentrant-semantics.md
+│       ├── ADR-006-non-reentrant-semantics.md
+│       ├── ADR-007-fencing-tokens.md
+│       └── ADR-008-annotation-aop.md
+├── scripts/
+│   └── k6-loadtest.js
 ├── .github/workflows/ci.yml
+├── grafana-dashboard.json
 ├── docker-compose.yml
 ├── build.gradle.kts
 ├── settings.gradle.kts
