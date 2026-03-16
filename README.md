@@ -560,8 +560,19 @@ If you need stronger guarantees, use a consensus system (ZooKeeper, etcd) instea
 - Comprehensive test suite: unit, Lua contract, integration, chaos (Testcontainers)
 - MIT License
 
+### v0.2.0 — Production Hardening
+- **Multi-module build**: split into `distributed-lock-core` (no Spring) + `distributed-lock-spring-boot-starter`
+- **Guarantees & Non-Guarantees matrix**: formal doc with scenario/guarantee/consumer-action columns
+- **Failure validation evidence**: documented chaos experiments with observed metrics/logs/outputs
+- **Property-based testing**: random acquire/release/renew sequences verifying safety invariants
+- **Real benchmarks**: measured p50/p95/p99 latency, throughput under contention, circuit breaker recovery time
+- **LockEngine decomposition**: extract RetryPolicy, ObservationHelper to reduce class size
+- **Versioning & compatibility policy**: semver contract, upgrade notes, backward compatibility guarantees
+
 ### Future Considerations
 - Admin inspection API / lock debugging endpoint
 - Lock contention dashboard
 - SQL backend
 - Reentrant locks
+- DB advisory lock backend
+- Multi-module: consumer without Spring dependency
